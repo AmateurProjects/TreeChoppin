@@ -129,6 +129,10 @@
     const woodEl = document.getElementById("wood");
     const barInner = document.getElementById("barInner");
     const targetNameEl = document.getElementById("targetName");
+    const hud = document.getElementById("hud");
+
+
+
 
     let score = 0;
     let wood = 0;
@@ -247,6 +251,15 @@
 
     function clamp01(x){ return Math.max(0, Math.min(1, x)); }
     function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+
+    // three r160-safe angle lerp (shortest path)
+    function lerpAngle(a, b, t) {
+      const TWO_PI = Math.PI * 2;
+      let delta = (b - a) % TWO_PI;
+      if (delta > Math.PI) delta -= TWO_PI;
+      if (delta < -Math.PI) delta += TWO_PI;
+      return a + delta * t;
+    }
 
     // ---------- Particles (woodchips + leaves) ----------
     const particles = []; // { mesh, v, life, maxLife, spin, drag, gravity, groundBounce, type }
@@ -651,6 +664,8 @@
     // ---------- Game loop ----------
     function animate() {
       requestAnimationFrame(animate);
+      
+      try {
       const dt = Math.min(clock.getDelta(), 0.05);
       const nowSeconds = clock.elapsedTime;
 
@@ -674,11 +689,12 @@
 
         // Rotate player to face movement direction (camera-relative)
         const targetYaw = Math.atan2(move.x, move.z);
-        player.rotation.y = THREE.MathUtils.lerpAngle(
+        player.rotation.y = lerpAngle(
           player.rotation.y,
           targetYaw,
           Math.min(1, turnSpeed * dt)
         );
+
 
         // Move strictly in camera-facing direction
         player.position.addScaledVector(move, speed * dt);
@@ -763,9 +779,21 @@
 
 
       renderer.render(scene, camera);
+
+      } catch (err) {
+        console.error(err);
+        const hud = document.getElementById("hud");
+        if (hud) {
+          hud.innerHTML = `
+            <div style="font-weight:800;color:#ffb4b4">Runtime error</div>
+            <div style="font-size:12px;white-space:pre-wrap">${String(err)}</div>
+          `;
+        }
+      }
     }
 
-    animate();
+    animate();      
+
 
     // ---------- Resize ----------
     window.addEventListener("resize", () => {
