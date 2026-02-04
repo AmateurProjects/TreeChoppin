@@ -77,6 +77,9 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     document.body.appendChild(renderer.domElement);
+    renderer.domElement.tabIndex = 0;           // make canvas focusable
+    renderer.domElement.style.outline = "none"; // no focus ring
+    renderer.domElement.focus();
 
     // ---------- Lights ----------
     scene.add(new THREE.AmbientLight(0xffffff, 0.35));
@@ -132,8 +135,16 @@
 
     // ---------- Input ----------
     const keys = new Set();
-    window.addEventListener("keydown", (e) => keys.add(e.code));
-    window.addEventListener("keyup", (e) => keys.delete(e.code));
+
+    renderer.domElement.addEventListener("keydown", (e) => {
+      keys.add(e.code);
+      // prevent arrow keys / space from scrolling if ever used later
+      if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
+    });
+
+    renderer.domElement.addEventListener("keyup", (e) => {
+      keys.delete(e.code);
+    });
 
     let isChopping = false;
     window.addEventListener("mousedown", (e) => { if (e.button === 0) isChopping = true; });
@@ -615,6 +626,7 @@
 
     // Click to lock pointer (required by browser)
     renderer.domElement.addEventListener("click", () => {
+      renderer.domElement.focus(); // <-- critical for WASD
       initAudio();
       renderer.domElement.requestPointerLock?.();
     });
@@ -624,7 +636,7 @@
       if (document.pointerLockElement !== renderer.domElement) return;
 
       camYaw   -= e.movementX * mouseSensitivity;
-      camPitch -= e.movementY * mouseSensitivity;
+      camPitch += e.movementY * mouseSensitivity; // inverted Y
       camPitch = Math.max(pitchMin, Math.min(pitchMax, camPitch));
     });
 
