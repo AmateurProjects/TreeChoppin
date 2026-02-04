@@ -68,7 +68,12 @@
 
     // ---------- Basic setup ----------
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x0b0f12, 30, 130);
+
+    // Blue sky background
+    scene.background = new THREE.Color(0x78b7ff);
+
+    // Softer fog (optional, keep it light so it doesn’t darken the scene)
+    scene.fog = new THREE.Fog(0x78b7ff, 140, 520);
 
     const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 500);
     camera.position.set(0, 6, 10);
@@ -82,27 +87,145 @@
     renderer.domElement.focus();
 
     // ---------- Lights ----------
-    scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+    // Sky + ground bounce lighting (very outdoor-looking)
+    const hemi = new THREE.HemisphereLight(0xbfdcff, 0x2a4a2a, 0.95);
+    scene.add(hemi);
 
-    const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-    sun.position.set(20, 40, 10);
+    // Sun light
+    const sun = new THREE.DirectionalLight(0xffffff, 1.25);
+    sun.position.set(80, 140, 60);
+    sun.castShadow = false; // keep simple for now
     scene.add(sun);
 
-    // ---------- Ground ----------
-    const groundGeo = new THREE.PlaneGeometry(400, 400, 1, 1);
-    const groundMat = new THREE.MeshStandardMaterial({ color: 0x1b2320, roughness: 1, metalness: 0 });
+    // Visible sun disc in the sky (simple)
+    const sunDisc = new THREE.Mesh(
+      new THREE.SphereGeometry(6, 24, 16),
+      new THREE.MeshBasicMaterial({ color: 0xfff2b0 })
+    );
+    sunDisc.position.copy(sun.position);
+    scene.add(sunDisc);
+
+
+    // ---------- Ground (rolling hills) ----------
+    const groundSize = 520;
+    const groundSegs = 220;
+
+    // More segments = smoother hills
+    const groundGeo = new THREE.PlaneGeometry(groundSize, groundSize, groundSegs, groundSegs);
+    groundGeo.rotateX(-Math.PI / 2);
+
+    // Lightweight 2D value-noise (no external libs)
+    function hash2(x, z) {
+      // deterministic pseudo-random 0..1
+      const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453123;
+      return s - Math.floor(s);
+    }
+    function smoothstep(t) { return t * t * (3 - 2 * t); }
+    function lerp(a, b, t) { return a + (b - a) * t; }
+
+    function valueNoise2D(x, z) {
+      const x0 = Math.floor(x), z0 = Math.floor(z);
+      const x1 = x0 + 1,       z1 = z0 + 1;
+
+      const sx = smoothstep(x - x0);
+      const sz = smoothstep(z - z0);
+
+      const n00 = hash2(x0, z0);
+      const n10 = hash2(x1, z0);
+      const n01 = hash2(x0, z1);
+      const n11 = hash2(x1, z1);
+
+      const ix0 = lerp(n00, n10, sx);
+      const ix1 = lerp(n01, n11, sx);
+      return lerp(ix0, ix1, sz);
+    }
+
+    // Fractal noise (octaves) for nicer hills
+    function fbm(x, z) {
+      
+          const HILL_HEIGHT = 7.0;
+
+          function getGroundHeight(x, z) {
+            return fbm(x, z) * HILL_HEIGHT;
+          }
+
+          // Approximate ground normal using finite differences
+          function getGroundNormal(x, z) {
+            const eps = 0.75;
+            const hL = getGroundHeight(x - eps, z);
+            const hR = getGroundHeight(x + eps, z);
+            const hD = getGroundHeight(x, z - eps);
+            const hU = getGroundHeight(x, z + eps);
+
+            // normal proportional to gradient: (hL-hR, 2*eps, hD-hU)
+            const n = new THREE.Vector3(hL - hR, 2 * eps, hD - hU);
+            return n.normalize();
+          }
+
+           
+      let amp = 1.0;
+      let freq = 0.035;
+      let sum = 0.0;
+      let norm = 0.0;
+
+      for (let i = 0; i < 5; i++) {
+        sum += (valueNoise2D(x * freq, z * freq) * 2 - 1) * amp;
+        norm += amp;
+        amp *= 0.5;
+        freq *= 2.0;
+      }
+      return sum / norm; // ~ -1..1
+    }
+
+    // Displace vertices in Y
+    const pos = groundGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+
+      // Rolling hills: broad + gentle
+      const h = fbm(x, z);
+      const height = h * HILL_HEIGHT;
+
+      pos.setY(i, height);
+    }
+    pos.needsUpdate = true;
+    groundGeo.computeVertexNormals();
+
+    // Grass material
+    const groundMat = new THREE.MeshStandardMaterial({
+      color: 0x2f8f3f,      // grass green
+      roughness: 1.0,
+      metalness: 0.0
+    });
+
     const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI / 2;
     ground.position.y = 0;
     scene.add(ground);
 
-    // Rocks
+    // Rocks (sit on hills + align to slope)
     const rockMat = new THREE.MeshStandardMaterial({ color: 0x2b2f33, roughness: 1 });
     for (let i = 0; i < 30; i++) {
-      const g = new THREE.DodecahedronGeometry(0.4 + Math.random() * 0.8);
+      const size = 0.4 + Math.random() * 0.8;
+      const g = new THREE.DodecahedronGeometry(size);
+      g.computeBoundingSphere();
+      const r = g.boundingSphere ? g.boundingSphere.radius : size;
+
       const m = new THREE.Mesh(g, rockMat);
-      m.position.set((Math.random() - 0.5) * 120, 0.4, (Math.random() - 0.5) * 120);
-      m.rotation.set(Math.random()*2, Math.random()*2, Math.random()*2);
+
+      const x = (Math.random() - 0.5) * 120;
+      const z = (Math.random() - 0.5) * 120;
+
+      const y = getGroundHeight(x, z);
+      const n = getGroundNormal(x, z);
+
+      // Place rock so it rests on surface (center lifted by radius)
+      m.position.set(x, y + r * 0.9, z);
+
+      // Align "up" to slope normal, then random twist around that normal
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
+      m.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(n, Math.random() * Math.PI * 2));
+
       scene.add(m);
     }
 
@@ -452,8 +575,18 @@
 
         if (Math.hypot(x, z) < 10) { i--; continue; }
 
-        t.position.set(x, 0, z);
-        t.rotation.y = Math.random() * Math.PI * 2;
+        // Sit tree base on terrain
+        const y = getGroundHeight(x, z);
+        const n = getGroundNormal(x, z);
+
+        t.position.set(x, y, z);
+
+        // Align tree "up" to slope normal
+        t.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
+
+        // Random twist around the slope normal (so forests don’t look uniform)
+        t.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(n, Math.random() * Math.PI * 2));
+
         const s = 0.8 + Math.random() * 0.6;
         t.scale.set(s, s, s);
 
@@ -479,7 +612,7 @@
         );
         log.rotation.z = Math.PI * 0.5;
         log.position.copy(tree.position);
-        log.position.y = 0.25;
+        log.position.y = tree.position.y + 0.25;
         log.position.addScaledVector(fallDir, 0.6 + Math.random() * 0.8);
         log.position.x += (Math.random() - 0.5) * 0.4;
         log.position.z += (Math.random() - 0.5) * 0.4;
@@ -511,8 +644,9 @@
         d.position.addScaledVector(d.userData.v, dt);
 
         // ground collide
-        if (d.position.y < 0.18) {
-          d.position.y = 0.18;
+        const gy = getGroundHeight(d.position.x, d.position.z) + 0.18;
+        if (d.position.y < gy) {
+          d.position.y = gy;
           d.userData.v.y *= -0.25; // small bounce
           d.userData.v.x *= 0.82;
           d.userData.v.z *= 0.82;
@@ -635,12 +769,18 @@
     const sprintSpeed = 10.0;
     const turnSpeed = 12.0;
 
+    // ---------- Jump / gravity ----------
+    let playerVy = 0;                // vertical velocity
+    let isGrounded = false;
+    const jumpSpeed = 6.4;           // jump impulse
+    const gravity = -18.0;           // downward accel (units/s^2)
+
 
     // --- Mouse-look (pointer lock) ---
     let camYaw = 0;                  // left/right
     let camPitch = -0.35;            // up/down (radians)
-    const pitchMin = -0.95;  // less "look straight down"
-    const pitchMax = 0.25;
+    const pitchMin = -1.15;          // can look further down
+    const pitchMax = 0.85;           // can look much further up
     const mouseSensitivity = 0.0022;
 
     // Click to lock pointer (required by browser)
@@ -679,7 +819,9 @@
       const camForward = new THREE.Vector3(
         -Math.sin(camYaw), 0, -Math.cos(camYaw)
       ).normalize();
-      const camRight = new THREE.Vector3().crossVectors(camForward, UP).normalize().multiplyScalar(-1);
+        const camRight = new THREE.Vector3()
+          .crossVectors(camForward, UP)
+          .normalize();
 
       if (keys.has("KeyW")) move.add(camForward);
       if (keys.has("KeyS")) move.sub(camForward);
@@ -702,7 +844,25 @@
         player.position.addScaledVector(move, speed * dt);
       }
 
-      player.position.y = 0;
+        // Ground height under player (terrain)
+        const groundY = getGroundHeight(player.position.x, player.position.z);
+
+        // Jump (Space) only when grounded
+        if (keys.has("Space") && isGrounded) {
+          playerVy = jumpSpeed;
+          isGrounded = false;
+        }
+
+        // Gravity integration
+        playerVy += gravity * dt;
+        player.position.y += playerVy * dt;
+
+        // Ground collision / landing
+        if (player.position.y <= groundY) {
+          player.position.y = groundY;
+          playerVy = 0;
+          isGrounded = true;
+        }
 
       // --- Camera (mouse-look orbit behind player) ---
       const camDistance = 10;
@@ -746,8 +906,8 @@
         if (chopHitTimer <= 0) {
           chopHitTimer = chopHitInterval;
 
-          spawnChopParticles(target);
-          playChopSound();
+        const origin = tree.position.clone();
+        origin.y = tree.position.y + 1.2;
         }
 
         if (target.userData.hp <= 0 && !target.userData.falling) {
