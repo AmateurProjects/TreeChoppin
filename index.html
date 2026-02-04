@@ -142,27 +142,6 @@
 
     // Fractal noise (octaves) for nicer hills
     function fbm(x, z) {
-      
-          const HILL_HEIGHT = 7.0;
-
-          function getGroundHeight(x, z) {
-            return fbm(x, z) * HILL_HEIGHT;
-          }
-
-          // Approximate ground normal using finite differences
-          function getGroundNormal(x, z) {
-            const eps = 0.75;
-            const hL = getGroundHeight(x - eps, z);
-            const hR = getGroundHeight(x + eps, z);
-            const hD = getGroundHeight(x, z - eps);
-            const hU = getGroundHeight(x, z + eps);
-
-            // normal proportional to gradient: (hL-hR, 2*eps, hD-hU)
-            const n = new THREE.Vector3(hL - hR, 2 * eps, hD - hU);
-            return n.normalize();
-          }
-
-           
       let amp = 1.0;
       let freq = 0.035;
       let sum = 0.0;
@@ -176,6 +155,25 @@
       }
       return sum / norm; // ~ -1..1
     }
+
+    const HILL_HEIGHT = 7.0;
+
+    function getGroundHeight(x, z) {
+      return fbm(x, z) * HILL_HEIGHT;
+    }
+
+    // Approximate ground normal using finite differences
+    function getGroundNormal(x, z) {
+      const eps = 0.75;
+      const hL = getGroundHeight(x - eps, z);
+      const hR = getGroundHeight(x + eps, z);
+      const hD = getGroundHeight(x, z - eps);
+      const hU = getGroundHeight(x, z + eps);
+
+      const n = new THREE.Vector3(hL - hR, 2 * eps, hD - hU);
+      return n.normalize();
+    }
+
 
     // Displace vertices in Y
     const pos = groundGeo.attributes.position;
@@ -396,7 +394,7 @@
     function spawnChopParticles(tree) {
       // spawn at about chest height near trunk
       const origin = tree.position.clone();
-      origin.y = 1.2;
+      origin.y = tree.position.y + 1.2;
 
       // determine a direction from player -> tree (chips fly away from trunk face)
       tmpV.copy(tree.position).sub(player.position);
@@ -485,8 +483,9 @@
         p.mesh.rotation.z += p.spin.z * dt;
 
         // ground
-        if (p.mesh.position.y < 0.02) {
-          p.mesh.position.y = 0.02;
+        const gy = getGroundHeight(p.mesh.position.x, p.mesh.position.z) + 0.02;
+        if (p.mesh.position.y < gy) {
+          p.mesh.position.y = gy;
           if (p.groundBounce > 0) {
             p.v.y = Math.abs(p.v.y) * p.groundBounce;
             p.v.x *= 0.75;
@@ -906,8 +905,8 @@
         if (chopHitTimer <= 0) {
           chopHitTimer = chopHitInterval;
 
-        const origin = tree.position.clone();
-        origin.y = tree.position.y + 1.2;
+          spawnChopParticles(target);
+          playChopSound();
         }
 
         if (target.userData.hp <= 0 && !target.userData.falling) {
