@@ -136,15 +136,21 @@
     // ---------- Input ----------
     const keys = new Set();
 
-    renderer.domElement.addEventListener("keydown", (e) => {
+    document.addEventListener("keydown", (e) => {
+      // Keep focus / pointer lock stable and stop browser shortcuts
+      if (["KeyW","KeyA","KeyS","KeyD","ShiftLeft","ShiftRight","Space",
+          "ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)) {
+        e.preventDefault();
+      }
       keys.add(e.code);
-      // prevent arrow keys / space from scrolling if ever used later
-      if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
-    });
+    }, { passive: false });
 
-    renderer.domElement.addEventListener("keyup", (e) => {
+    document.addEventListener("keyup", (e) => {
       keys.delete(e.code);
     });
+
+    // Avoid "stuck keys" if the tab loses focus
+    window.addEventListener("blur", () => keys.clear());
 
     let isChopping = false;
     window.addEventListener("mousedown", (e) => { if (e.button === 0) isChopping = true; });
