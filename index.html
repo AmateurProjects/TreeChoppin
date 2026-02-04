@@ -676,7 +676,9 @@
       const move = new THREE.Vector3();
 
       // Forward/right derived ONLY from mouse-look yaw
-      const camForward = new THREE.Vector3(Math.sin(camYaw), 0, Math.cos(camYaw)).normalize();
+      const camForward = new THREE.Vector3(
+        -Math.sin(camYaw), 0, -Math.cos(camYaw)
+      ).normalize();
       const camRight = new THREE.Vector3().crossVectors(camForward, UP).normalize().multiplyScalar(-1);
 
       if (keys.has("KeyW")) move.add(camForward);
