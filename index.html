@@ -380,7 +380,7 @@
     // ---------- Movement tuning ----------
     const baseSpeed = 6.0;
     const sprintSpeed = 10.0;
-    const turnSpeed = 10.0;
+    const turnSpeed = 12.0;
 
     // ---------- Game loop ----------
     function animate() {
@@ -408,14 +408,15 @@
       if (move.lengthSq() > 0) {
         move.normalize();
 
+        // Rotate player to face movement direction (camera-relative)
         const targetYaw = Math.atan2(move.x, move.z);
-        const currentYaw = player.rotation.y;
+        player.rotation.y = THREE.MathUtils.lerpAngle(
+          player.rotation.y,
+          targetYaw,
+          Math.min(1, turnSpeed * dt)
+        );
 
-        let deltaYaw = targetYaw - currentYaw;
-        while (deltaYaw > Math.PI) deltaYaw -= Math.PI * 2;
-        while (deltaYaw < -Math.PI) deltaYaw += Math.PI * 2;
-
-        player.rotation.y += deltaYaw * Math.min(1, turnSpeed * dt);
+        // Move strictly in camera-facing direction
         player.position.addScaledVector(move, speed * dt);
       }
 
