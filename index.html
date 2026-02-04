@@ -19,13 +19,15 @@
       padding: 10px 12px;
       border-radius: 12px;
       backdrop-filter: blur(6px);
-      max-width: 320px;
+      max-width: 340px;
     }
     #hint { font-size: 12px; opacity: 0.9; margin-top: 6px; line-height: 1.3; }
-    #score { font-weight: 700; }
+    .statline { margin-top: 6px; font-size: 13px; }
+    #score, #wood { font-weight: 800; }
+
     #chopWrap { margin-top: 10px; }
     #barOuter {
-      width: 240px; height: 10px;
+      width: 260px; height: 10px;
       border-radius: 999px;
       background: rgba(255,255,255,0.12);
       overflow: hidden;
@@ -49,10 +51,10 @@
 </head>
 <body>
   <div id="hud">
-    <div>Score: <span id="score">0</span></div>
+    <div class="statline">Score: <span id="score">0</span> &nbsp;•&nbsp; Wood: <span id="wood">0</span></div>
     <div id="hint">
       Move: <b>WASD</b> • Sprint: <b>Shift</b> • Chop: <b>Hold Left Click</b><br/>
-      Get close to a tree, face it, and chop.
+      Aim at a tree (center dot), get close, and chop.
     </div>
     <div id="chopWrap">
       <div id="barOuter"><div id="barInner"></div></div>
@@ -61,9 +63,8 @@
   </div>
   <div id="centerDot"></div>
 
-  <!-- Three.js (module) -->
   <script type="module">
-    import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 
     // ---------- Basic setup ----------
     const scene = new THREE.Scene();
@@ -92,7 +93,7 @@
     ground.position.y = 0;
     scene.add(ground);
 
-    // Add a few crude rocks
+    // Rocks
     const rockMat = new THREE.MeshStandardMaterial({ color: 0x2b2f33, roughness: 1 });
     for (let i = 0; i < 30; i++) {
       const g = new THREE.DodecahedronGeometry(0.4 + Math.random() * 0.8);
@@ -106,14 +107,12 @@
     const player = new THREE.Group();
     scene.add(player);
 
-    // crude body
     const bodyGeo = new THREE.CapsuleGeometry(0.45, 0.8, 6, 10);
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0x7aa7ff, roughness: 0.7 });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     body.position.y = 0.9;
     player.add(body);
 
-    // crude "axe" indicator
     const axeGeo = new THREE.BoxGeometry(0.1, 0.6, 0.1);
     const axeMat = new THREE.MeshStandardMaterial({ color: 0xd9d9d9, roughness: 0.4 });
     const axe = new THREE.Mesh(axeGeo, axeMat);
@@ -122,21 +121,54 @@
 
     player.position.set(0, 0, 0);
 
+    // ---------- UI ----------
+    const scoreEl = document.getElementById("score");
+    const woodEl = document.getElementById("wood");
+    const barInner = document.getElementById("barInner");
+    const targetNameEl = document.getElementById("targetName");
+
+    let score = 0;
+    let wood = 0;
+
+    // ---------- Input ----------
+    const keys = new Set();
+    window.addEventListener("keydown", (e) => keys.add(e.code));
+    window.addEventListener("keyup", (e) => keys.delete(e.code));
+
+    let isChopping = false;
+    window.addEventListener("mousedown", (e) => { if (e.button === 0) isChopping = true; });
+    window.addEventListener("mouseup", (e) => { if (e.button === 0) isChopping = false; });
+
+    // ---------- Helpers ----------
+    const clock = new THREE.Clock();
+    const raycaster = new THREE.Raycaster();
+    const tmpV = new THREE.Vector3();
+    const tmpV2 = new THREE.Vector3();
+    const UP = new THREE.Vector3(0, 1, 0);
+
+    function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+    function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+
     // ---------- Trees ----------
     const trees = [];
     const treeGroup = new THREE.Group();
     scene.add(treeGroup);
 
+    // For raycast, we keep a list of mesh objects that belong to trees
+    const treePickMeshes = [];
+
     function makeTree(name) {
       const g = new THREE.Group();
       g.name = name;
+      g.userData.isTree = true;
 
-      // trunk
+      // trunk (bottom sits on y=0 because trunk height=2 and centered at y=1)
       const trunk = new THREE.Mesh(
         new THREE.CylinderGeometry(0.25, 0.35, 2.0, 8),
         new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 1 })
       );
       trunk.position.y = 1.0;
+      trunk.userData.treeRoot = g;
       g.add(trunk);
 
       // leaves
@@ -145,23 +177,32 @@
         new THREE.MeshStandardMaterial({ color: 0x2f7d46, roughness: 1 })
       );
       leaves.position.y = 3.0;
+      leaves.userData.treeRoot = g;
       g.add(leaves);
 
-      // chop state
+      // Raycast candidates
+      treePickMeshes.push(trunk, leaves);
+
+      // chop + fall state
       g.userData.hp = 1.0;          // 0..1
       g.userData.maxHp = 1.0;
       g.userData.alive = true;
 
+      g.userData.falling = false;
+      g.userData.fallT = 0;         // 0..1 over fall duration
+      g.userData.fallAxis = new THREE.Vector3(1,0,0);
+      g.userData.fallAngle = 0;
+      g.userData.removeAt = null;   // time in seconds (clock) to remove after hitting ground
+
       return g;
     }
 
-    function scatterTrees(count = 60) {
+    function scatterTrees(count = 70) {
       for (let i = 0; i < count; i++) {
         const t = makeTree("Tree " + (i + 1));
         const x = (Math.random() - 0.5) * 140;
         const z = (Math.random() - 0.5) * 140;
 
-        // keep spawn area a bit clear near player
         if (Math.hypot(x, z) < 10) { i--; continue; }
 
         t.position.set(x, 0, z);
@@ -175,101 +216,189 @@
     }
     scatterTrees(70);
 
-    // ---------- Input ----------
-    const keys = new Set();
-    window.addEventListener("keydown", (e) => keys.add(e.code));
-    window.addEventListener("keyup", (e) => keys.delete(e.code));
+    // ---------- Wood drops ----------
+    const woodDrops = [];
+    const woodGroup = new THREE.Group();
+    scene.add(woodGroup);
 
-    let isChopping = false;
-    window.addEventListener("mousedown", (e) => {
-      if (e.button === 0) isChopping = true;
-    });
-    window.addEventListener("mouseup", (e) => {
-      if (e.button === 0) isChopping = false;
-    });
+    function spawnWoodDrops(tree, fallDir) {
+      const dropCount = 2 + Math.floor(Math.random() * 3); // 2..4
+      const logMat = new THREE.MeshStandardMaterial({ color: 0x8a5a34, roughness: 1 });
 
-    // Pointer lock (optional)
-    // If you want mouse-look later, we can enable pointer lock on click.
+      for (let i = 0; i < dropCount; i++) {
+        const log = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.12, 0.12, 0.45, 8),
+          logMat
+        );
+        log.rotation.z = Math.PI * 0.5;
+        log.position.copy(tree.position);
+        log.position.y = 0.25;
+        log.position.addScaledVector(fallDir, 0.6 + Math.random() * 0.8);
+        log.position.x += (Math.random() - 0.5) * 0.4;
+        log.position.z += (Math.random() - 0.5) * 0.4;
 
-    // ---------- UI ----------
-    const scoreEl = document.getElementById("score");
-    const barInner = document.getElementById("barInner");
-    const targetNameEl = document.getElementById("targetName");
+        // simple velocity + gravity
+        const v = new THREE.Vector3(
+          (Math.random() - 0.5) * 1.2 + fallDir.x * (0.5 + Math.random()),
+          2.2 + Math.random() * 1.2,
+          (Math.random() - 0.5) * 1.2 + fallDir.z * (0.5 + Math.random())
+        );
 
-    let score = 0;
+        log.userData.v = v;
+        log.userData.collected = false;
 
-    // ---------- Helpers ----------
-    const raycaster = new THREE.Raycaster();
-    const forward = new THREE.Vector3();
-    const tmpVec = new THREE.Vector3();
-
-    function getForwardDir() {
-      // player forward in world space
-      player.getWorldDirection(forward);
-      forward.y = 0;
-      forward.normalize();
-      return forward;
+        woodGroup.add(log);
+        woodDrops.push(log);
+      }
     }
 
-    function findBestTreeTarget() {
-      // We pick the closest tree that is roughly in front of the player.
-      const maxDist = 4.0;
-      const fwd = getForwardDir();
+    function updateWoodDrops(dt) {
+      const gravity = -8.5;
 
-      let best = null;
-      let bestScore = -Infinity;
+      for (let i = woodDrops.length - 1; i >= 0; i--) {
+        const d = woodDrops[i];
+        if (d.userData.collected) continue;
 
-      for (const t of trees) {
-        if (!t.userData.alive) continue;
+        // physics-lite
+        d.userData.v.y += gravity * dt;
+        d.position.addScaledVector(d.userData.v, dt);
 
-        tmpVec.copy(t.position).sub(player.position);
-        const dist = tmpVec.length();
-        if (dist > maxDist) continue;
+        // ground collide
+        if (d.position.y < 0.18) {
+          d.position.y = 0.18;
+          d.userData.v.y *= -0.25; // small bounce
+          d.userData.v.x *= 0.82;
+          d.userData.v.z *= 0.82;
 
-        tmpVec.normalize();
-        const facing = fwd.dot(tmpVec); // 1 = perfect, -1 behind
-        if (facing < 0.35) continue; // must be somewhat in front
+          // stop jitter
+          if (Math.abs(d.userData.v.y) < 0.2) d.userData.v.y = 0;
+        }
 
-        // score closer + more centered
-        const s = (1.0 / (dist + 0.001)) + facing * 0.5;
-        if (s > bestScore) {
-          bestScore = s;
-          best = t;
+        // spin a bit
+        d.rotation.x += dt * 1.8;
+        d.rotation.y += dt * 1.1;
+
+        // auto-collect if close to player
+        tmpV.copy(d.position).sub(player.position);
+        tmpV.y = 0;
+        if (tmpV.length() < 1.15) {
+          d.userData.collected = true;
+          woodGroup.remove(d);
+          woodDrops.splice(i, 1);
+
+          wood += 1;
+          woodEl.textContent = String(wood);
         }
       }
-
-      return best;
     }
 
-    function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+    // ---------- Targeting (center-screen raycast) ----------
+    function pickTreeFromCenter() {
+      raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+      const hits = raycaster.intersectObjects(treePickMeshes, false);
 
-    // ---------- Game loop ----------
-    const clock = new THREE.Clock();
+      if (!hits.length) return null;
 
-    // Movement tuning
+      // find first alive tree within range
+      const maxDist = 5.0;
+
+      for (const h of hits) {
+        const root = h.object.userData.treeRoot;
+        if (!root) continue;
+        if (!root.userData.alive) continue;
+        if (root.userData.falling) continue;
+
+        // distance check from player to tree base
+        tmpV.copy(root.position).sub(player.position);
+        tmpV.y = 0;
+        if (tmpV.length() <= maxDist) return root;
+      }
+
+      return null;
+    }
+
+    // ---------- Chopping + falling ----------
+    const chopRate = 0.60; // hp per second
+    const fallDuration = 0.65; // seconds
+    const removeDelayAfterFall = 1.1;
+
+    function startTreeFall(tree) {
+      tree.userData.falling = true;
+      tree.userData.fallT = 0;
+      tree.userData.fallAngle = 0;
+
+      // Fall direction AWAY from player (tree -> away direction)
+      tmpV.copy(tree.position).sub(player.position);
+      tmpV.y = 0;
+      if (tmpV.lengthSq() < 0.0001) tmpV.set(1, 0, 0);
+      tmpV.normalize(); // this points from player to tree, so "away from player" for the tree top
+
+      // Axis to rotate around so the tree tips in tmpV direction:
+      // rotate around axis perpendicular to UP and fallDir.
+      tmpV2.crossVectors(UP, tmpV).normalize();
+      if (tmpV2.lengthSq() < 0.0001) tmpV2.set(0, 0, 1);
+
+      tree.userData.fallAxis.copy(tmpV2);
+
+      // Spawn wood after impact (we’ll do it when fall completes)
+      tree.userData.fallDir = tmpV.clone();
+    }
+
+    function updateFallingTrees(dt, nowSeconds) {
+      for (let i = trees.length - 1; i >= 0; i--) {
+        const t = trees[i];
+        if (!t.userData.alive) continue;
+
+        if (t.userData.falling) {
+          t.userData.fallT = Math.min(1, t.userData.fallT + dt / fallDuration);
+          const eased = easeOutCubic(t.userData.fallT);
+
+          const targetAngle = Math.PI / 2; // 90 degrees
+          const angle = eased * targetAngle;
+          t.userData.fallAngle = angle;
+
+          // Apply axis-angle rotation (keep base at y=0)
+          t.setRotationFromAxisAngle(t.userData.fallAxis, angle);
+
+          // when impact happens (fallT hits 1), schedule removal + spawn wood once
+          if (t.userData.fallT >= 1 && t.userData.removeAt == null) {
+            t.userData.removeAt = nowSeconds + removeDelayAfterFall;
+
+            // drop wood in the direction it fell
+            spawnWoodDrops(t, t.userData.fallDir || new THREE.Vector3(1,0,0));
+          }
+
+          // remove after delay
+          if (t.userData.removeAt != null && nowSeconds >= t.userData.removeAt) {
+            t.userData.alive = false;
+            treeGroup.remove(t);
+          }
+        }
+      }
+    }
+
+    // ---------- Movement tuning ----------
     const baseSpeed = 6.0;
     const sprintSpeed = 10.0;
-    const turnSpeed = 10.0; // higher = snappier
+    const turnSpeed = 10.0;
 
-    // Chop tuning
-    const chopRate = 0.55; // hp per second (so ~1.8s per tree)
-
+    // ---------- Game loop ----------
     function animate() {
       requestAnimationFrame(animate);
       const dt = Math.min(clock.getDelta(), 0.05);
+      const nowSeconds = clock.elapsedTime;
 
-      // --- Movement ---
+      // --- Movement (camera-relative) ---
       const sprint = keys.has("ShiftLeft") || keys.has("ShiftRight");
       const speed = sprint ? sprintSpeed : baseSpeed;
 
-      // movement direction in world space (camera-relative)
       const move = new THREE.Vector3();
       const camForward = new THREE.Vector3();
       camera.getWorldDirection(camForward);
       camForward.y = 0;
       camForward.normalize();
 
-      const camRight = new THREE.Vector3().crossVectors(camForward, new THREE.Vector3(0,1,0)).normalize().multiplyScalar(-1);
+      const camRight = new THREE.Vector3().crossVectors(camForward, UP).normalize().multiplyScalar(-1);
 
       if (keys.has("KeyW")) move.add(camForward);
       if (keys.has("KeyS")) move.sub(camForward);
@@ -279,54 +408,47 @@
       if (move.lengthSq() > 0) {
         move.normalize();
 
-        // rotate player toward movement direction
         const targetYaw = Math.atan2(move.x, move.z);
         const currentYaw = player.rotation.y;
 
-        // shortest-angle lerp
         let deltaYaw = targetYaw - currentYaw;
         while (deltaYaw > Math.PI) deltaYaw -= Math.PI * 2;
         while (deltaYaw < -Math.PI) deltaYaw += Math.PI * 2;
 
         player.rotation.y += deltaYaw * Math.min(1, turnSpeed * dt);
-
-        // translate
         player.position.addScaledVector(move, speed * dt);
       }
 
-      // keep player on ground
       player.position.y = 0;
 
       // --- Camera follow ---
-      // offset behind player, based on player rotation
-      const behind = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0,1,0), player.rotation.y);
+      const behind = new THREE.Vector3(0, 0, 1).applyAxisAngle(UP, player.rotation.y);
       const camPos = player.position.clone()
         .addScaledVector(behind, 10)
         .add(new THREE.Vector3(0, 6, 0));
 
-      // smooth camera
       camera.position.lerp(camPos, 1 - Math.pow(0.001, dt));
       camera.lookAt(player.position.x, player.position.y + 1.2, player.position.z);
 
-      // --- Targeting / Chopping ---
-      const target = findBestTreeTarget();
+      // --- Targeting ---
+      const target = pickTreeFromCenter();
       targetNameEl.textContent = target ? target.name : "None";
 
+      // --- Chopping ---
       if (target && isChopping) {
         target.userData.hp = clamp01(target.userData.hp - chopRate * dt);
 
-        // crude feedback: wiggle the axe + tree
+        // crude feedback: wiggle the axe + shake target slightly
         axe.rotation.z = Math.sin(performance.now() * 0.05) * 0.6;
-        target.rotation.z = Math.sin(performance.now() * 0.03) * 0.08;
+        target.rotation.z = Math.sin(performance.now() * 0.03) * 0.06;
 
-        if (target.userData.hp <= 0 && target.userData.alive) {
-          target.userData.alive = false;
-
-          // remove tree (simple)
-          treeGroup.remove(target);
-
+        if (target.userData.hp <= 0 && !target.userData.falling) {
+          // count as chopped
           score += 1;
           scoreEl.textContent = String(score);
+
+          // begin fall away from player
+          startTreeFall(target);
         }
       } else {
         axe.rotation.z = 0;
@@ -339,6 +461,10 @@
       } else {
         barInner.style.width = `0%`;
       }
+
+      // --- Update falling + drops ---
+      updateFallingTrees(dt, nowSeconds);
+      updateWoodDrops(dt);
 
       renderer.render(scene, camera);
     }
