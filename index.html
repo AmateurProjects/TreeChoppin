@@ -382,6 +382,30 @@
     const sprintSpeed = 10.0;
     const turnSpeed = 12.0;
 
+
+    // --- Mouse-look (pointer lock) ---
+    let camYaw = 0;                  // left/right
+    let camPitch = -0.35;            // up/down (radians)
+    const pitchMin = -1.1;
+    const pitchMax = 0.25;
+    const mouseSensitivity = 0.0022;
+
+    // Click to lock pointer (required by browser)
+    renderer.domElement.addEventListener("click", () => {
+      renderer.domElement.requestPointerLock?.();
+    });
+
+    // Update yaw/pitch when pointer is locked
+    window.addEventListener("mousemove", (e) => {
+      if (document.pointerLockElement !== renderer.domElement) return;
+
+      camYaw   -= e.movementX * mouseSensitivity;
+      camPitch -= e.movementY * mouseSensitivity;
+      camPitch = Math.max(pitchMin, Math.min(pitchMax, camPitch));
+    });
+
+
+
     // ---------- Game loop ----------
     function animate() {
       requestAnimationFrame(animate);
@@ -393,7 +417,7 @@
       const speed = sprint ? sprintSpeed : baseSpeed;
 
       const move = new THREE.Vector3();
-      const camForward = new THREE.Vector3();
+      const camForward = new THREE.Vector3(Math.sin(camYaw), 0, Math.cos(camYaw)).normalize();
       camera.getWorldDirection(camForward);
       camForward.y = 0;
       camForward.normalize();
@@ -422,13 +446,25 @@
 
       player.position.y = 0;
 
-      // --- Camera follow ---
-      const behind = new THREE.Vector3(0, 0, 1).applyAxisAngle(UP, player.rotation.y);
-      const camPos = player.position.clone()
-        .addScaledVector(behind, 10)
-        .add(new THREE.Vector3(0, 6, 0));
+      // --- Camera (mouse-look orbit behind player) ---
+      const camDistance = 10;
+      const camHeight   = 2.2;
 
-      camera.position.lerp(camPos, 1 - Math.pow(0.001, dt));
+      // Build an offset from yaw/pitch like an orbit camera
+      const offset = new THREE.Vector3(
+        Math.sin(camYaw) * Math.cos(camPitch),
+        Math.sin(camPitch),
+        Math.cos(camYaw) * Math.cos(camPitch)
+      ).multiplyScalar(camDistance);
+
+      // Position camera behind/around player
+      const desiredCamPos = player.position.clone().add(offset);
+      desiredCamPos.y += camHeight;
+
+      // Smooth camera
+      camera.position.lerp(desiredCamPos, 1 - Math.pow(0.001, dt));
+
+      // Look at player (slightly above center)
       camera.lookAt(player.position.x, player.position.y + 1.2, player.position.z);
 
       // --- Targeting ---
