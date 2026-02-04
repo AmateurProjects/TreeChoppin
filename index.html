@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tree Chopping Prototype</title>
+  <style>
+    html, body { margin:0; padding:0; overflow:hidden; background:#0b0f12; }
+    canvas { display:block; }
+
+    /* Minimal HUD */
+    #hud {
+      position: fixed;
+      left: 12px; top: 12px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: #e8f0f7;
+      user-select: none;
+      background: rgba(0,0,0,0.35);
+      padding: 10px 12px;
+      border-radius: 12px;
+      backdrop-filter: blur(6px);
+      max-width: 320px;
+    }
+    #hint { font-size: 12px; opacity: 0.9; margin-top: 6px; line-height: 1.3; }
+    #score { font-weight: 700; }
+    #chopWrap { margin-top: 10px; }
+    #barOuter {
+      width: 240px; height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.12);
+      overflow: hidden;
+    }
+    #barInner {
+      width: 0%;
+      height: 100%;
+      background: rgba(120, 220, 120, 0.95);
+    }
+    #targetLine { font-size: 12px; margin-top: 6px; opacity: 0.9; }
+    #centerDot {
+      position: fixed; left: 50%; top: 50%;
+      width: 6px; height: 6px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: rgba(255,255,255,0.7);
+      box-shadow: 0 0 0 3px rgba(0,0,0,0.25);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <div>Score: <span id="score">0</span></div>
+    <div id="hint">
+      Move: <b>WASD</b> • Sprint: <b>Shift</b> • Chop: <b>Hold Left Click</b><br/>
+      Get close to a tree, face it, and chop.
+    </div>
+    <div id="chopWrap">
+      <div id="barOuter"><div id="barInner"></div></div>
+      <div id="targetLine">Target: <span id="targetName">None</span></div>
+    </div>
+  </div>
+  <div id="centerDot"></div>
+
+  <!-- Three.js (module) -->
+  <script type="module">
+    import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+
+    // ---------- Basic setup ----------
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x0b0f12, 30, 130);
+
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 500);
+    camera.position.set(0, 6, 10);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    // ---------- Lights ----------
+    scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+
+    const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+    sun.position.set(20, 40, 10);
+    scene.add(su
