@@ -139,6 +139,88 @@
     window.addEventListener("mousedown", (e) => { if (e.button === 0) isChopping = true; });
     window.addEventListener("mouseup", (e) => { if (e.button === 0) isChopping = false; });
 
+    // ---------- Audio (procedural WebAudio) ----------
+    let audioCtx = null;
+    let masterGain = null;
+
+    function initAudio() {
+      if (audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = 0.25;
+      masterGain.connect(audioCtx.destination);
+    }
+
+    function playChopSound() {
+      if (!audioCtx) return;
+
+      const t = audioCtx.currentTime;
+
+      // Short "thunk": oscillator + quick envelope
+      const osc = audioCtx.createOscillator();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(180 + Math.random() * 60, t);
+      osc.frequency.exponentialRampToValueAtTime(90 + Math.random() * 30, t + 0.06);
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.25 + Math.random() * 0.12, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+
+      // Add a little noise "crunch" for wood fibers
+      const noise = audioCtx.createBufferSource();
+      const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.12, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.6;
+      noise.buffer = buffer;
+
+      const noiseFilter = audioCtx.createBiquadFilter();
+      noiseFilter.type = "bandpass";
+      noiseFilter.frequency.setValueAtTime(900 + Math.random() * 400, t);
+      noiseFilter.Q.setValueAtTime(1.5, t);
+
+      const noiseGain = audioCtx.createGain();
+      noiseGain.gain.setValueAtTime(0.0001, t);
+      noiseGain.gain.exponentialRampToValueAtTime(0.10 + Math.random() * 0.06, t + 0.01);
+      noiseGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+
+      osc.connect(gain);
+      gain.connect(masterGain);
+
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(masterGain);
+
+      osc.start(t);
+      osc.stop(t + 0.12);
+
+      noise.start(t);
+      noise.stop(t + 0.12);
+    }
+
+    function playTreeThud() {
+      if (!audioCtx) return;
+      const t = audioCtx.currentTime;
+
+      const osc = audioCtx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(80, t);
+      osc.frequency.exponentialRampToValueAtTime(45, t + 0.18);
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.35, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+
+      osc.connect(gain);
+      gain.connect(masterGain);
+
+      osc.start(t);
+      osc.stop(t + 0.28);
+    }
+
+
+
     // ---------- Helpers ----------
     const clock = new THREE.Clock();
     const raycaster = new THREE.Raycaster();
@@ -148,6 +230,141 @@
 
     function clamp01(x){ return Math.max(0, Math.min(1, x)); }
     function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+
+    // ---------- Particles (woodchips + leaves) ----------
+    const particles = []; // { mesh, v, life, maxLife, spin, drag, gravity, groundBounce, type }
+
+    const woodChipMat = new THREE.MeshStandardMaterial({ color: 0x9a6b3a, roughness: 1 });
+    const leafMat     = new THREE.MeshStandardMaterial({ color: 0x2f7d46, roughness: 1, side: THREE.DoubleSide });
+
+    const woodChipGeo = new THREE.BoxGeometry(0.06, 0.02, 0.02);
+    const leafGeo     = new THREE.PlaneGeometry(0.08, 0.10);
+
+    function spawnChopParticles(tree) {
+      // spawn at about chest height near trunk
+      const origin = tree.position.clone();
+      origin.y = 1.2;
+
+      // determine a direction from player -> tree (chips fly away from trunk face)
+      tmpV.copy(tree.position).sub(player.position);
+      tmpV.y = 0;
+      if (tmpV.lengthSq() < 0.0001) tmpV.set(0, 0, 1);
+      tmpV.normalize();
+
+      // --- woodchips (fast) ---
+      const chipCount = 10 + Math.floor(Math.random() * 8);
+      for (let i = 0; i < chipCount; i++) {
+        const m = new THREE.Mesh(woodChipGeo, woodChipMat);
+        m.position.copy(origin);
+        m.position.x += (Math.random() - 0.5) * 0.18;
+        m.position.y += (Math.random() - 0.5) * 0.20;
+        m.position.z += (Math.random() - 0.5) * 0.18;
+
+        // velocity: mostly outward + up
+        const v = new THREE.Vector3(
+          tmpV.x * (2.0 + Math.random() * 2.5) + (Math.random() - 0.5) * 1.5,
+          2.0 + Math.random() * 2.5,
+          tmpV.z * (2.0 + Math.random() * 2.5) + (Math.random() - 0.5) * 1.5
+        );
+
+        m.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+
+        scene.add(m);
+        particles.push({
+          mesh: m,
+          v,
+          life: 0.45 + Math.random() * 0.25,
+          maxLife: 0.7,
+          spin: new THREE.Vector3((Math.random()-0.5)*14, (Math.random()-0.5)*14, (Math.random()-0.5)*14),
+          drag: 0.88,
+          gravity: -12.0,
+          groundBounce: 0.25,
+          type: "chip"
+        });
+      }
+
+      // --- leaves (slow + floaty) ---
+      const leafCount = 6 + Math.floor(Math.random() * 6);
+      for (let i = 0; i < leafCount; i++) {
+        const m = new THREE.Mesh(leafGeo, leafMat);
+        m.position.copy(origin);
+        m.position.y += 1.3 + Math.random() * 0.8; // originate higher
+        m.position.x += (Math.random() - 0.5) * 0.9;
+        m.position.z += (Math.random() - 0.5) * 0.9;
+
+        // leaves drift down
+        const v = new THREE.Vector3(
+          (Math.random() - 0.5) * 0.8 + tmpV.x * 0.3,
+          -0.2 - Math.random() * 0.6,
+          (Math.random() - 0.5) * 0.8 + tmpV.z * 0.3
+        );
+
+        m.rotation.set(0, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2);
+
+        scene.add(m);
+        particles.push({
+          mesh: m,
+          v,
+          life: 1.6 + Math.random() * 1.1,
+          maxLife: 2.8,
+          spin: new THREE.Vector3((Math.random()-0.5)*3, (Math.random()-0.5)*2, (Math.random()-0.5)*6),
+          drag: 0.985,
+          gravity: -1.0,
+          groundBounce: 0.0,
+          type: "leaf"
+        });
+      }
+    }
+
+    function updateParticles(dt) {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+
+        // integrate
+        p.v.y += p.gravity * dt;
+        p.v.multiplyScalar(Math.pow(p.drag, dt * 60));
+
+        p.mesh.position.addScaledVector(p.v, dt);
+
+        // spin
+        p.mesh.rotation.x += p.spin.x * dt;
+        p.mesh.rotation.y += p.spin.y * dt;
+        p.mesh.rotation.z += p.spin.z * dt;
+
+        // ground
+        if (p.mesh.position.y < 0.02) {
+          p.mesh.position.y = 0.02;
+          if (p.groundBounce > 0) {
+            p.v.y = Math.abs(p.v.y) * p.groundBounce;
+            p.v.x *= 0.75;
+            p.v.z *= 0.75;
+          } else {
+            // leaves just rest
+            p.v.set(0, 0, 0);
+          }
+        }
+
+        // life/fade
+        p.life -= dt;
+        const alpha = Math.max(0, Math.min(1, p.life / p.maxLife));
+
+        // quick fade on chips (material transparency)
+        if (p.type === "chip") {
+          p.mesh.material.transparent = true;
+          p.mesh.material.opacity = alpha;
+        } else {
+          p.mesh.material.transparent = true;
+          p.mesh.material.opacity = alpha;
+        }
+
+        if (p.life <= 0) {
+          scene.remove(p.mesh);
+          particles.splice(i, 1);
+        }
+      }
+    }
+
+
 
     // ---------- Trees ----------
     const trees = [];
@@ -321,6 +538,11 @@
     const chopRate = 0.60; // hp per second
     const fallDuration = 0.65; // seconds
     const removeDelayAfterFall = 1.1;
+    // Chop "hit" cadence (visual + sound)
+    let chopHitTimer = 0;
+    const chopHitInterval = 0.12; // seconds between bursts while holding
+
+
 
     function startTreeFall(tree) {
       tree.userData.falling = true;
@@ -365,6 +587,7 @@
             t.userData.removeAt = nowSeconds + removeDelayAfterFall;
 
             // drop wood in the direction it fell
+            playTreeThud();
             spawnWoodDrops(t, t.userData.fallDir || new THREE.Vector3(1,0,0));
           }
 
@@ -386,12 +609,13 @@
     // --- Mouse-look (pointer lock) ---
     let camYaw = 0;                  // left/right
     let camPitch = -0.35;            // up/down (radians)
-    const pitchMin = -1.1;
+    const pitchMin = -0.95;  // less "look straight down"
     const pitchMax = 0.25;
     const mouseSensitivity = 0.0022;
 
     // Click to lock pointer (required by browser)
     renderer.domElement.addEventListener("click", () => {
+      initAudio();
       renderer.domElement.requestPointerLock?.();
     });
 
@@ -417,11 +641,9 @@
       const speed = sprint ? sprintSpeed : baseSpeed;
 
       const move = new THREE.Vector3();
-      const camForward = new THREE.Vector3(Math.sin(camYaw), 0, Math.cos(camYaw)).normalize();
-      camera.getWorldDirection(camForward);
-      camForward.y = 0;
-      camForward.normalize();
 
+      // Forward/right derived ONLY from mouse-look yaw
+      const camForward = new THREE.Vector3(Math.sin(camYaw), 0, Math.cos(camYaw)).normalize();
       const camRight = new THREE.Vector3().crossVectors(camForward, UP).normalize().multiplyScalar(-1);
 
       if (keys.has("KeyW")) move.add(camForward);
@@ -457,9 +679,13 @@
         Math.cos(camYaw) * Math.cos(camPitch)
       ).multiplyScalar(camDistance);
 
-      // Position camera behind/around player
+            // Position camera behind/around player
       const desiredCamPos = player.position.clone().add(offset);
       desiredCamPos.y += camHeight;
+
+      // --- Ground collision (simple clamp) ---
+      const minCamY = 0.6;              // keep camera above ground
+      desiredCamPos.y = Math.max(minCamY, desiredCamPos.y);
 
       // Smooth camera
       camera.position.lerp(desiredCamPos, 1 - Math.pow(0.001, dt));
@@ -479,6 +705,15 @@
         axe.rotation.z = Math.sin(performance.now() * 0.05) * 0.6;
         target.rotation.z = Math.sin(performance.now() * 0.03) * 0.06;
 
+        // Trigger particles + sound at a steady "axe hit" rhythm
+        chopHitTimer -= dt;
+        if (chopHitTimer <= 0) {
+          chopHitTimer = chopHitInterval;
+
+          spawnChopParticles(target);
+          playChopSound();
+        }
+
         if (target.userData.hp <= 0 && !target.userData.falling) {
           // count as chopped
           score += 1;
@@ -486,9 +721,13 @@
 
           // begin fall away from player
           startTreeFall(target);
+
+          // reset so next tree hit starts with an immediate burst
+          chopHitTimer = 0;
         }
       } else {
         axe.rotation.z = 0;
+        chopHitTimer = 0; // reset cadence when not chopping / no target
       }
 
       // Update chop bar
@@ -502,6 +741,8 @@
       // --- Update falling + drops ---
       updateFallingTrees(dt, nowSeconds);
       updateWoodDrops(dt);
+      updateParticles(dt);
+
 
       renderer.render(scene, camera);
     }
