@@ -273,7 +273,6 @@
         <button id="playBtn" class="modalBtn modalBtnPlay" disabled>Play</button>
       </div>
 
-      <div class="modalSubtext"></div>
     </div>
   </div>
 
@@ -1248,6 +1247,7 @@
     // Chop "hit" cadence (visual + sound)
     let chopHitTimer = 0;
     const chopHitInterval = 0.12; // seconds between bursts while holding
+    let lastWobbleTree = null;
 
 
 
@@ -1298,7 +1298,7 @@
             spawnWoodDrops(t, t.userData.fallDir || new THREE.Vector3(1,0,0));
 
             // 1/10 chance: impact "white puddle" splat
-            if (Math.random() < 0.10) {
+            if (Math.random() < 0.25) {
               spawnWhitePuddleExplosion(t);
             }
           }
@@ -1456,8 +1456,18 @@
         target.userData.hp = clamp01(target.userData.hp - chopRate * dt);
 
         // crude feedback: wiggle the axe + shake target slightly
-        axe.rotation.z = Math.sin(performance.now() * 0.05) * 0.6;
+      axe.rotation.z = Math.sin(performance.now() * 0.05) * 0.6;
+
+      // If we switched targets, reset the old tree so it doesn't stay tilted
+      if (lastWobbleTree && lastWobbleTree !== target && !lastWobbleTree.userData.falling) {
+        lastWobbleTree.rotation.z = 0;
+      }
+      lastWobbleTree = target;
+
+      // Apply wobble only to non-falling trees
+      if (!target.userData.falling) {
         target.rotation.z = Math.sin(performance.now() * 0.03) * 0.06;
+      }
 
         // Trigger particles + sound at a steady "axe hit" rhythm
         chopHitTimer -= dt;
@@ -1481,7 +1491,13 @@
         }
       } else {
         axe.rotation.z = 0;
-        chopHitTimer = 0; // reset cadence when not chopping / no target
+        chopHitTimer = 0;
+
+        // Clear wobble so trees don't remain tilted after a single chop
+        if (lastWobbleTree && !lastWobbleTree.userData.falling) {
+          lastWobbleTree.rotation.z = 0;
+        }
+        lastWobbleTree = null;
       }
 
       // Update chop bar
