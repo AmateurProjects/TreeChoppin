@@ -2,11 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
   <title>Tree Chopping Prototype</title>
   <style>
     html, body { margin:0; padding:0; overflow:hidden; background:#0b0f12; }
     canvas { display:block; }
+
+    /* Prevent selection/highlight/callout on mobile */
+    html, body {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none; /* iOS long-press menu */
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Still allow selecting text inside the HUD if you ever want to copy; optional */
+    /* #hud { -webkit-user-select: none; user-select: none; } */
 
     /* Minimal HUD */
     #hud {
@@ -216,6 +227,13 @@
       display: none !important;
     }
 
+    #donationModal, .touch-ui, .touch-joystick, .touch-chop, .modalBtn, .modalCard {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
 
 
 
@@ -289,6 +307,19 @@
     renderer.domElement.focus();
     // Prevent browser touch gestures from interfering with gameplay
     renderer.domElement.style.touchAction = "none";
+
+        // Extra iOS Safari guards: prevent pinch/double-tap zoom
+    document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive:false });
+    document.addEventListener("gesturechange", (e) => e.preventDefault(), { passive:false });
+    document.addEventListener("gestureend", (e) => e.preventDefault(), { passive:false });
+
+    // Prevent double-tap to zoom (best-effort)
+    let lastTouchEnd = 0;
+    document.addEventListener("touchend", (e) => {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) e.preventDefault();
+      lastTouchEnd = now;
+    }, { passive:false });
 
 
     // ---------- Lights ----------
