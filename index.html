@@ -118,6 +118,103 @@
       text-shadow: 0 2px 10px rgba(0,0,0,0.45);
     }
 
+    /* ---------- Modal overlay ---------- */
+    .modalOverlay{
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(8px);
+      z-index: 999;          /* above HUD + touch UI */
+      pointer-events: auto;
+      touch-action: none;    /* prevent scroll/zoom while modal open */
+    }
+
+    .modalCard{
+      width: min(520px, calc(100vw - 32px));
+      background: rgba(16, 22, 28, 0.92);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 18px;
+      box-shadow: 0 18px 70px rgba(0,0,0,0.45);
+      padding: 18px 18px 14px;
+      color: #e8f0f7;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    .modalTitle{
+      font-weight: 900;
+      font-size: 18px;
+      line-height: 1.25;
+      margin-bottom: 14px;
+    }
+
+    .modalRow{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .modalBtn{
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.10);
+      color: #e8f0f7;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-weight: 900;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    .modalBtn:active{
+      transform: translateY(1px);
+    }
+
+    .modalBtnPlus{
+      width: 56px;
+      height: 56px;
+      font-size: 26px;
+      display: grid;
+      place-items: center;
+    }
+
+    .modalValue{
+      min-width: 92px;
+      font-size: 20px;
+      font-weight: 900;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(0,0,0,0.22);
+      border: 1px solid rgba(255,255,255,0.10);
+      text-align: center;
+    }
+
+    .modalSpacer{
+      flex: 1;
+    }
+
+    .modalBtnPlay{
+      min-width: 110px;
+      height: 56px;
+      font-size: 16px;
+    }
+
+    .modalBtn:disabled{
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .modalSubtext{
+      margin-top: 10px;
+      font-size: 12px;
+      opacity: 0.85;
+    }
+
+    .modalHidden{
+      display: none !important;
+    }
 
 
 
@@ -143,6 +240,24 @@
     <div id="joyBase" class="touch-joystick" aria-label="Move joystick">
       <div id="joyStick" class="stick"></div>
     </div>
+
+  <!-- Donation Modal (blocks input; game continues rendering behind) -->
+  <div id="donationModal" class="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modalCard">
+      <div class="modalTitle" id="modalTitle">Welcome to Tree Chop! How much do you donate?</div>
+
+      <div class="modalRow">
+        <button id="donatePlusBtn" class="modalBtn modalBtnPlus" aria-label="Increase donation">+</button>
+        <div id="donateValue" class="modalValue">$0</div>
+
+        <div class="modalSpacer"></div>
+
+        <button id="playBtn" class="modalBtn modalBtnPlay" disabled>Play</button>
+      </div>
+
+      <div class="modalSubtext">Tap + to choose: $0 → $1 → $10 → $69</div>
+    </div>
+  </div>
 
     <div id="chopBtn" class="touch-chop" aria-label="Chop button">CHOP</div>
 
@@ -341,6 +456,65 @@
     const barInner = document.getElementById("barInner");
     const targetNameEl = document.getElementById("targetName");
     const hud = document.getElementById("hud");
+    // ---------- Donation Modal ----------
+    const donationModal = document.getElementById("donationModal");
+    const donatePlusBtn = document.getElementById("donatePlusBtn");
+    const donateValueEl = document.getElementById("donateValue");
+    const playBtn = document.getElementById("playBtn");
+
+    const donationValues = [0, 1, 10, 69];
+    let donationIndex = 0;        // starts at $0
+    let donateTappedOnce = false; // Play only works after + tapped at least once
+    let modalOpen = true;
+
+    function updateDonationUI(){
+      donateValueEl.textContent = `$${donationValues[donationIndex]}`;
+      playBtn.disabled = !donateTappedOnce;
+
+      // When at max ($69), + becomes inert (still clickable but does nothing)
+      if (donationIndex >= donationValues.length - 1) {
+        donatePlusBtn.style.opacity = "0.75";
+      } else {
+        donatePlusBtn.style.opacity = "1";
+      }
+    }
+
+    function closeDonationModal(){
+      modalOpen = false;
+      donationModal.classList.add("modalHidden");
+
+      // Return focus to the canvas so keyboard works immediately
+      renderer.domElement.focus();
+    }
+
+    // Keep clicks/touches from "falling through" to the canvas
+    donationModal.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    }, { passive:false });
+
+    donatePlusBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      initAudio();
+
+      donateTappedOnce = true;
+      if (donationIndex < donationValues.length - 1) {
+        donationIndex++;
+      }
+      updateDonationUI();
+    });
+
+    playBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      initAudio();
+
+      if (!donateTappedOnce) return; // hard guard
+      closeDonationModal();
+    });
+
+    updateDonationUI();
 
 
 
@@ -1128,6 +1302,9 @@
 
     // Click to lock pointer (required by browser)
     renderer.domElement.addEventListener("click", () => {
+      // Don't pointer-lock if the donation modal is still open
+      if (typeof modalOpen !== "undefined" && modalOpen) return;
+
       renderer.domElement.focus(); // <-- critical for WASD
       initAudio();
       renderer.domElement.requestPointerLock?.();
