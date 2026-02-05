@@ -906,8 +906,8 @@
         m.rotation.x = -Math.PI / 2;
 
         // Start small, expand fast
-        const endScale = 1.2 + Math.random() * 1.6; // overall radius feel
-        m.scale.set(0.08, 0.08, 0.08);
+        const endScale = 3.0 + Math.random() * 2.5; // MUCH larger splash
+        m.scale.set(0.12, 0.12, 0.12);
 
         scene.add(m);
         particles.push({
@@ -926,12 +926,12 @@
       }
 
       // Droplets (small splats around it)
-      const drops = 5 + Math.floor(Math.random() * 5); // 5..9
+      const drops = 7 + Math.floor(Math.random() * 6); // 7..12
       for (let i = 0; i < drops; i++) {
         const m = new THREE.Mesh(puddleGeo, puddleMat.clone());
         m.material.opacity = 0.85;
 
-        const r = 0.6 + Math.random() * 1.8;
+        const r = 1.4 + Math.random() * 3.0; // splat farther from trunk
         const a = Math.random() * Math.PI * 2;
         const x = baseX + Math.cos(a) * r;
         const z = baseZ + Math.sin(a) * r;
@@ -940,8 +940,8 @@
         m.position.set(x, y, z);
         m.rotation.x = -Math.PI / 2;
 
-        const endScale = 0.25 + Math.random() * 0.55;
-        m.scale.set(0.05, 0.05, 0.05);
+        const endScale = 0.6 + Math.random() * 1.1; // much larger droplets
+        m.scale.set(0.08, 0.08, 0.08);
 
         scene.add(m);
         particles.push({
@@ -1071,16 +1071,19 @@
 
         // Special behavior: puddles expand quickly then fade
         if (p.type === "puddle") {
-          const t = 1 - (p.life / p.maxLife);                 // 0..1
-          const grow = easeOutCubic(Math.min(1, t * 3.0));     // fast expansion
-          const s = p.startScale + (p.endScale - p.startScale) * grow;
+          const t = 1 - (p.life / p.maxLife); // 0..1 over lifetime
 
+          // Hold briefly, then spread slowly
+          const hold = 0.12; // 12% of lifetime = little delay before expanding
+          const tt = (t - hold) / (1 - hold);
+          const grow = easeOutCubic(Math.max(0, Math.min(1, tt))); // slow, smooth expansion
+
+          const s = p.startScale + (p.endScale - p.startScale) * grow;
           p.mesh.scale.set(s, s, s);
           p.mesh.rotation.x = -Math.PI / 2;
 
-          // keep pinned to ground
-          const py = getGroundHeight(p.mesh.position.x, p.mesh.position.z) + 0.015;
-          p.mesh.position.y = py;
+          // pin to ground
+          p.mesh.position.y = getGroundHeight(p.mesh.position.x, p.mesh.position.z) + 0.015;
         }
 
         // quick fade on chips (material transparency)
