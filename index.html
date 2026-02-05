@@ -2,21 +2,30 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="viewport"
+        content="width=device-width,
+                initial-scale=1,
+                minimum-scale=1,
+                maximum-scale=1,
+                user-scalable=no,
+                viewport-fit=cover" />
   <title>Tree Chopping Prototype</title>
   <style>
     html, body { margin:0; padding:0; overflow:hidden; background:#0b0f12; }
     canvas { display:block; }
 
     /* Prevent selection/highlight/callout on mobile */
+    /* Hard-disable touch zoom / highlight */
     html, body {
+      touch-action: none;
+      -webkit-touch-callout: none;
       -webkit-user-select: none;
       user-select: none;
-      -webkit-touch-callout: none; /* iOS long-press menu */
       -webkit-tap-highlight-color: transparent;
     }
 
     /* Still allow selecting text inside the HUD if you ever want to copy; optional */
+    
     /* #hud { -webkit-user-select: none; user-select: none; } */
 
     /* Minimal HUD */
@@ -233,6 +242,11 @@
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
     }
+    button, .modalBtn, .touch-chop, .touch-joystick {
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
 
 
 
@@ -278,7 +292,6 @@
 
     <div id="chopBtn" class="touch-chop" aria-label="Chop button">CHOP</div>
 
-    <div class="touch-tip" id="touchTip">Left thumb: move • Right thumb drag: look • Hold CHOP: chop</div>
   </div>
 
 
@@ -307,19 +320,20 @@
     // Prevent browser touch gestures from interfering with gameplay
     renderer.domElement.style.touchAction = "none";
 
-        // Extra iOS Safari guards: prevent pinch/double-tap zoom
+    // Extra iOS Safari guards: prevent pinch/double-tap zoom
     document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive:false });
     document.addEventListener("gesturechange", (e) => e.preventDefault(), { passive:false });
     document.addEventListener("gestureend", (e) => e.preventDefault(), { passive:false });
 
-    // Prevent double-tap to zoom (best-effort)
+    // Block double-tap zoom
     let lastTouchEnd = 0;
     document.addEventListener("touchend", (e) => {
       const now = Date.now();
-      if (now - lastTouchEnd <= 300) e.preventDefault();
+      if (now - lastTouchEnd < 300) {
+        e.preventDefault();
+      }
       lastTouchEnd = now;
     }, { passive:false });
-
 
     // ---------- Lights ----------
     // Sky + ground bounce lighting (very outdoor-looking)
@@ -498,6 +512,7 @@
     let modalOpen = true;
 
     function updateDonationUI(){
+      scheduleNextDonation(0);
       donateValueEl.textContent = `$${donationValues[donationIndex]}`;
       playBtn.disabled = !donateTappedOnce;
 
@@ -516,6 +531,20 @@
       // Return focus to the canvas so keyboard works immediately
       renderer.domElement.focus();
     }
+
+    function openDonationModal(){
+    modalOpen = true;
+
+    // Reset donation state
+    donationIndex = 0;
+    donateTappedOnce = false;
+    updateDonationUI();
+
+    donationModal.classList.remove("modalHidden");
+    }
+
+
+
 
     // Keep clicks/touches from "falling through" to the canvas
     donationModal.addEventListener("pointerdown", (e) => {
@@ -551,6 +580,15 @@
 
     let score = 0;
     let wood = 0;
+
+    // ---------- Donation modal random timer ----------
+    let nextDonationAt = 0;
+
+    function scheduleNextDonation(nowSeconds){
+      // random 10–15 seconds
+      nextDonationAt = nowSeconds + 10 + Math.random() * 5;
+    }
+
 
     // ---------- Input ----------
     const keys = new Set();
@@ -1129,7 +1167,10 @@
         // Random twist around the slope normal (so forests don’t look uniform)
         t.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(n, Math.random() * Math.PI * 2));
 
-        const s = 0.8 + Math.random() * 0.6;
+        // Save the aligned "resting" rotation so wobble/fall can be applied relative to it
+        t.userData.baseQuat = t.quaternion.clone();
+
+        const s = 1.2 + Math.random() * 0.8; // bigger trees
         t.scale.set(s, s, s);
 
         treeGroup.add(t);
@@ -1269,6 +1310,9 @@
 
       tree.userData.fallAxis.copy(tmpV2);
 
+      // Ensure we have a base rotation snapshot
+      if (!tree.userData.baseQuat) tree.userData.baseQuat = tree.quaternion.clone();
+
       // Spawn wood after impact (we’ll do it when fall completes)
       tree.userData.fallDir = tmpV.clone();
     }
@@ -1287,7 +1331,9 @@
           t.userData.fallAngle = angle;
 
           // Apply axis-angle rotation (keep base at y=0)
-          t.setRotationFromAxisAngle(t.userData.fallAxis, angle);
+          // Apply fall rotation relative to the tree's base (slope-aligned) rotation
+          const fallQ = new THREE.Quaternion().setFromAxisAngle(t.userData.fallAxis, angle);
+          t.quaternion.copy(t.userData.baseQuat).multiply(fallQ);
 
           // when impact happens (fallT hits 1), schedule removal + spawn wood once
           if (t.userData.fallT >= 1 && t.userData.removeAt == null) {
@@ -1459,14 +1505,19 @@
       axe.rotation.z = Math.sin(performance.now() * 0.05) * 0.6;
 
       // If we switched targets, reset the old tree so it doesn't stay tilted
-      if (lastWobbleTree && lastWobbleTree !== target && !lastWobbleTree.userData.falling) {
-        lastWobbleTree.rotation.z = 0;
+      if (lastWobbleTree && lastWobbleTree !== target && !lastWobbleTree.userData.falling && lastWobbleTree.userData.baseQuat) {
+        lastWobbleTree.quaternion.copy(lastWobbleTree.userData.baseQuat);
       }
       lastWobbleTree = target;
 
       // Apply wobble only to non-falling trees
       if (!target.userData.falling) {
-        target.rotation.z = Math.sin(performance.now() * 0.03) * 0.06;
+        // Wobble relative to base rotation so it never permanently tilts
+        if (!target.userData.baseQuat) target.userData.baseQuat = target.quaternion.clone();
+        const wobble = Math.sin(performance.now() * 0.03) * 0.06;
+        const wobbleAxis = new THREE.Vector3(1,0,0).applyQuaternion(target.userData.baseQuat).normalize();
+        const wobbleQ = new THREE.Quaternion().setFromAxisAngle(wobbleAxis, wobble);
+        target.quaternion.copy(target.userData.baseQuat).multiply(wobbleQ);
       }
 
         // Trigger particles + sound at a steady "axe hit" rhythm
@@ -1491,12 +1542,12 @@
         }
       } else {
         axe.rotation.z = 0;
+        // Reset any previously wobbled tree back to its base orientation
+        if (lastWobbleTree && lastWobbleTree.userData.baseQuat && !lastWobbleTree.userData.falling) {
+          lastWobbleTree.quaternion.copy(lastWobbleTree.userData.baseQuat);
+        }
         chopHitTimer = 0;
 
-        // Clear wobble so trees don't remain tilted after a single chop
-        if (lastWobbleTree && !lastWobbleTree.userData.falling) {
-          lastWobbleTree.rotation.z = 0;
-        }
         lastWobbleTree = null;
       }
 
@@ -1510,6 +1561,13 @@
 
       // --- Update falling + drops ---
       updateFallingTrees(dt, nowSeconds);
+      
+      // --- Random donation popup ---
+      if (!modalOpen && nowSeconds >= nextDonationAt) {
+        openDonationModal();
+        scheduleNextDonation(nowSeconds);
+      }
+      
       updateWoodDrops(dt);
       updateParticles(dt);
 
