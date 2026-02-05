@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
   <title>Tree Chopping Prototype</title>
   <style>
     html, body { margin:0; padding:0; overflow:hidden; background:#0b0f12; }
@@ -47,6 +47,81 @@
       box-shadow: 0 0 0 3px rgba(0,0,0,0.25);
       pointer-events: none;
     }
+    /* ---------- Touch controls (mobile) ---------- */
+    .touch-ui {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .touch-ui.show { display: block; }
+    .touch-ui { display: none; }
+
+    .touch-joystick {
+      position: fixed;
+      left: 18px;
+      bottom: 18px;
+      width: 140px;
+      height: 140px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.18);
+      backdrop-filter: blur(6px);
+      pointer-events: auto;
+      touch-action: none;
+    }
+    .touch-joystick .stick {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 64px;
+      height: 64px;
+      border-radius: 999px;
+      transform: translate(-50%, -50%);
+      background: rgba(255,255,255,0.18);
+      border: 1px solid rgba(255,255,255,0.22);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+    }
+
+    .touch-chop {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      width: 108px;
+      height: 108px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.22);
+      color: #e8f0f7;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+      pointer-events: auto;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      display: grid;
+      place-items: center;
+      backdrop-filter: blur(6px);
+    }
+
+    .touch-tip {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: 170px;
+      text-align: center;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: rgba(232,240,247,0.85);
+      font-size: 12px;
+      pointer-events: none;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.45);
+    }
+
+
+
+
+
   </style>
 </head>
 <body>
@@ -62,6 +137,18 @@
     </div>
   </div>
   <div id="centerDot"></div>
+
+  <!-- Touch UI (shown automatically on mobile / touch devices) -->
+  <div id="touchUI" class="touch-ui">
+    <div id="joyBase" class="touch-joystick" aria-label="Move joystick">
+      <div id="joyStick" class="stick"></div>
+    </div>
+
+    <div id="chopBtn" class="touch-chop" aria-label="Chop button">CHOP</div>
+
+    <div class="touch-tip" id="touchTip">Left thumb: move • Right thumb drag: look • Hold CHOP: chop</div>
+  </div>
+
 
   <script type="module">
     import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
@@ -85,6 +172,9 @@
     renderer.domElement.tabIndex = 0;           // make canvas focusable
     renderer.domElement.style.outline = "none"; // no focus ring
     renderer.domElement.focus();
+    // Prevent browser touch gestures from interfering with gameplay
+    renderer.domElement.style.touchAction = "none";
+
 
     // ---------- Lights ----------
     // Sky + ground bounce lighting (very outdoor-looking)
@@ -280,6 +370,165 @@
     let isChopping = false;
     window.addEventListener("mousedown", (e) => { if (e.button === 0) isChopping = true; });
     window.addEventListener("mouseup", (e) => { if (e.button === 0) isChopping = false; });
+
+    // ---------- Touch controls ----------
+    const touchUI = document.getElementById("touchUI");
+    const joyBase = document.getElementById("joyBase");
+    const joyStick = document.getElementById("joyStick");
+    const chopBtn = document.getElementById("chopBtn");
+    const touchTip = document.getElementById("touchTip");
+
+    const isTouchDevice =
+      ("ontouchstart" in window) ||
+      (navigator.maxTouchPoints && navigator.maxTouchPoints > 0) ||
+      window.matchMedia?.("(pointer: coarse)")?.matches;
+
+    // joystick vector: x = right(+), y = forward(+)
+    const joy = { active:false, pid:null, cx:0, cy:0, x:0, y:0, sprint:false };
+    const joyRadius = 52; // px (stick travel)
+
+    // touch-look
+    const look = { active:false, pid:null, lastX:0, lastY:0 };
+
+    if (isTouchDevice) {
+      touchUI.classList.add("show");
+
+      // Update hint for mobile (optional: hide desktop hint text)
+      const hint = document.getElementById("hint");
+      if (hint) hint.innerHTML = `Touch: <b>Left joystick</b> move • <b>Right drag</b> look • <b>Hold CHOP</b>`;
+
+      // Prevent page scrolling while interacting
+      document.body.style.overscrollBehavior = "none";
+      document.body.style.touchAction = "none";
+    } else {
+      // Hide the mobile tip on desktop
+      if (touchTip) touchTip.style.display = "none";
+    }
+
+    function setJoyFromPointer(px, py) {
+      const dx = px - joy.cx;
+      const dy = py - joy.cy;
+
+      // clamp to radius
+      const len = Math.hypot(dx, dy) || 1;
+      const clampedLen = Math.min(len, joyRadius);
+      const nx = (dx / len) * clampedLen;
+      const ny = (dy / len) * clampedLen;
+
+      // stick position
+      joyStick.style.transform = `translate(${nx - 32}px, ${ny - 32}px)`; // 64px stick => -32 offset
+
+      // normalized movement vector
+      joy.x = nx / joyRadius;
+      joy.y = -ny / joyRadius; // invert so up is forward
+
+      // simple sprint when pushed far
+      joy.sprint = (Math.hypot(joy.x, joy.y) > 0.88);
+    }
+
+    function resetJoy() {
+      joy.active = false;
+      joy.pid = null;
+      joy.x = 0; joy.y = 0; joy.sprint = false;
+      joyStick.style.transform = "translate(-32px, -32px)";
+    }
+
+    // Joystick pointer events
+    joyBase?.addEventListener("pointerdown", (e) => {
+      if (!isTouchDevice) return;
+      e.preventDefault();
+
+      initAudio(); // unlock audio on gesture
+      joyBase.setPointerCapture(e.pointerId);
+
+      const rect = joyBase.getBoundingClientRect();
+      joy.active = true;
+      joy.pid = e.pointerId;
+      joy.cx = rect.left + rect.width * 0.5;
+      joy.cy = rect.top + rect.height * 0.5;
+
+      setJoyFromPointer(e.clientX, e.clientY);
+    }, { passive:false });
+
+    joyBase?.addEventListener("pointermove", (e) => {
+      if (!joy.active || e.pointerId !== joy.pid) return;
+      e.preventDefault();
+      setJoyFromPointer(e.clientX, e.clientY);
+    }, { passive:false });
+
+    joyBase?.addEventListener("pointerup", (e) => {
+      if (!joy.active || e.pointerId !== joy.pid) return;
+      e.preventDefault();
+      resetJoy();
+    }, { passive:false });
+
+    joyBase?.addEventListener("pointercancel", () => resetJoy());
+
+    // Chop button (hold)
+    function setChop(on) { isChopping = on; }
+    chopBtn?.addEventListener("pointerdown", (e) => {
+      if (!isTouchDevice) return;
+      e.preventDefault();
+      initAudio();
+      chopBtn.setPointerCapture(e.pointerId);
+      setChop(true);
+    }, { passive:false });
+
+    chopBtn?.addEventListener("pointerup", (e) => {
+      if (!isTouchDevice) return;
+      e.preventDefault();
+      setChop(false);
+    }, { passive:false });
+
+    chopBtn?.addEventListener("pointercancel", () => setChop(false));
+
+    // Touch-look: any drag on canvas NOT starting on UI controls
+    function isOnTouchUI(target) {
+      return target === joyBase || target === joyStick || target === chopBtn || joyBase?.contains(target) || chopBtn?.contains(target);
+    }
+
+    renderer.domElement.addEventListener("pointerdown", (e) => {
+      if (!isTouchDevice) return;
+      if (isOnTouchUI(e.target)) return;
+
+      e.preventDefault();
+      initAudio();
+
+      look.active = true;
+      look.pid = e.pointerId;
+      look.lastX = e.clientX;
+      look.lastY = e.clientY;
+
+      renderer.domElement.setPointerCapture(e.pointerId);
+    }, { passive:false });
+
+    renderer.domElement.addEventListener("pointermove", (e) => {
+      if (!isTouchDevice) return;
+      if (!look.active || e.pointerId !== look.pid) return;
+
+      e.preventDefault();
+      const dx = e.clientX - look.lastX;
+      const dy = e.clientY - look.lastY;
+      look.lastX = e.clientX;
+      look.lastY = e.clientY;
+
+      // Similar feel to mouse sensitivity, tuned for touch
+      const touchLookSensitivity = mouseSensitivity * 2.4;
+      camYaw   -= dx * touchLookSensitivity;
+      camPitch += dy * touchLookSensitivity;
+      camPitch = Math.max(pitchMin, Math.min(pitchMax, camPitch));
+    }, { passive:false });
+
+    function endLook(e) {
+      if (!look.active) return;
+      if (e && e.pointerId !== look.pid) return;
+      look.active = false;
+      look.pid = null;
+    }
+
+    renderer.domElement.addEventListener("pointerup", endLook, { passive:false });
+    renderer.domElement.addEventListener("pointercancel", endLook, { passive:false });
+
 
     // ---------- Audio (procedural WebAudio) ----------
     let audioCtx = null;
@@ -809,7 +1058,7 @@
       const nowSeconds = clock.elapsedTime;
 
       // --- Movement (camera-relative) ---
-      const sprint = keys.has("ShiftLeft") || keys.has("ShiftRight");
+      const sprint = (keys.has("ShiftLeft") || keys.has("ShiftRight")) || (isTouchDevice && joy.sprint);
       const speed = sprint ? sprintSpeed : baseSpeed;
 
       const move = new THREE.Vector3();
@@ -822,10 +1071,17 @@
           .crossVectors(camForward, UP)
           .normalize();
 
+      // Keyboard
       if (keys.has("KeyW")) move.add(camForward);
       if (keys.has("KeyS")) move.sub(camForward);
       if (keys.has("KeyA")) move.sub(camRight);
       if (keys.has("KeyD")) move.add(camRight);
+
+      // Touch joystick
+      if (isTouchDevice && (joy.x !== 0 || joy.y !== 0)) {
+        move.addScaledVector(camRight, joy.x);
+        move.addScaledVector(camForward, joy.y);
+      }
 
       if (move.lengthSq() > 0) {
         move.normalize();
