@@ -640,6 +640,82 @@
     const woodChipGeo = new THREE.BoxGeometry(0.06, 0.02, 0.02);
     const leafGeo     = new THREE.PlaneGeometry(0.08, 0.10);
 
+    // ---------- "White puddle" splat ----------
+    const puddleMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false
+    });
+    const puddleGeo = new THREE.CircleGeometry(1, 40);
+
+    function spawnWhitePuddleExplosion(tree) {
+      // Base position near the tree trunk on the ground
+      const baseX = tree.position.x;
+      const baseZ = tree.position.z;
+
+      // Main puddle
+      {
+        const m = new THREE.Mesh(puddleGeo, puddleMat.clone());
+        const y = getGroundHeight(baseX, baseZ) + 0.015;
+        m.position.set(baseX, y, baseZ);
+        m.rotation.x = -Math.PI / 2;
+
+        // Start small, expand fast
+        const endScale = 1.2 + Math.random() * 1.6; // overall radius feel
+        m.scale.set(0.08, 0.08, 0.08);
+
+        scene.add(m);
+        particles.push({
+          mesh: m,
+          v: new THREE.Vector3(0, 0, 0),
+          life: 1.1,
+          maxLife: 1.1,
+          spin: new THREE.Vector3(0, 0, 0),
+          drag: 1,
+          gravity: 0,
+          groundBounce: 0,
+          type: "puddle",
+          startScale: 0.08,
+          endScale
+        });
+      }
+
+      // Droplets (small splats around it)
+      const drops = 5 + Math.floor(Math.random() * 5); // 5..9
+      for (let i = 0; i < drops; i++) {
+        const m = new THREE.Mesh(puddleGeo, puddleMat.clone());
+        m.material.opacity = 0.85;
+
+        const r = 0.6 + Math.random() * 1.8;
+        const a = Math.random() * Math.PI * 2;
+        const x = baseX + Math.cos(a) * r;
+        const z = baseZ + Math.sin(a) * r;
+        const y = getGroundHeight(x, z) + 0.015;
+
+        m.position.set(x, y, z);
+        m.rotation.x = -Math.PI / 2;
+
+        const endScale = 0.25 + Math.random() * 0.55;
+        m.scale.set(0.05, 0.05, 0.05);
+
+        scene.add(m);
+        particles.push({
+          mesh: m,
+          v: new THREE.Vector3(0, 0, 0),
+          life: 0.75 + Math.random() * 0.55,
+          maxLife: 0.75 + Math.random() * 0.55,
+          spin: new THREE.Vector3(0, 0, 0),
+          drag: 1,
+          gravity: 0,
+          groundBounce: 0,
+          type: "puddle",
+          startScale: 0.05,
+          endScale
+        });
+      }
+    }
+
     function spawnChopParticles(tree) {
       // spawn at about chest height near trunk
       const origin = tree.position.clone();
@@ -748,6 +824,20 @@
         // life/fade
         p.life -= dt;
         const alpha = Math.max(0, Math.min(1, p.life / p.maxLife));
+
+        // Special behavior: puddles expand quickly then fade
+        if (p.type === "puddle") {
+          const t = 1 - (p.life / p.maxLife);                 // 0..1
+          const grow = easeOutCubic(Math.min(1, t * 3.0));     // fast expansion
+          const s = p.startScale + (p.endScale - p.startScale) * grow;
+
+          p.mesh.scale.set(s, s, s);
+          p.mesh.rotation.x = -Math.PI / 2;
+
+          // keep pinned to ground
+          const py = getGroundHeight(p.mesh.position.x, p.mesh.position.z) + 0.015;
+          p.mesh.position.y = py;
+        }
 
         // quick fade on chips (material transparency)
         if (p.type === "chip") {
@@ -1001,6 +1091,11 @@
             // drop wood in the direction it fell
             playTreeThud();
             spawnWoodDrops(t, t.userData.fallDir || new THREE.Vector3(1,0,0));
+
+            // 1/10 chance: impact "white puddle" splat
+            if (Math.random() < 0.10) {
+              spawnWhitePuddleExplosion(t);
+            }
           }
 
           // remove after delay
