@@ -512,7 +512,6 @@
     let modalOpen = true;
 
     function updateDonationUI(){
-      scheduleNextDonation(0);
       donateValueEl.textContent = `$${donationValues[donationIndex]}`;
       playBtn.disabled = !donateTappedOnce;
 
@@ -571,6 +570,9 @@
 
       if (!donateTappedOnce) return; // hard guard
       closeDonationModal();
+
+      // Start the random timer AFTER the modal is dismissed
+      scheduleNextDonation(clock.elapsedTime);
     });
 
     updateDonationUI();
