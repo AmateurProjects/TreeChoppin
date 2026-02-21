@@ -66,6 +66,22 @@
       background: rgba(255,255,255,0.7);
       box-shadow: 0 0 0 3px rgba(0,0,0,0.25);
       pointer-events: none;
+      transition: background 0.15s, box-shadow 0.15s, width 0.15s, height 0.15s;
+    }
+    #centerDot.targeting {
+      width: 10px; height: 10px;
+      background: rgba(120, 220, 120, 0.95);
+      box-shadow: 0 0 0 3px rgba(0,0,0,0.25), 0 0 8px rgba(120,220,120,0.5);
+    }
+    .floatText {
+      position: fixed;
+      pointer-events: none;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      font-weight: 900;
+      font-size: 18px;
+      color: #ffe066;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.5);
+      z-index: 50;
     }
     /* ---------- Touch controls (mobile) ---------- */
     .touch-ui {
@@ -236,6 +252,127 @@
       display: none !important;
     }
 
+    /* ---------- Vendor greeting toast ---------- */
+    #vendorGreeting {
+      position: fixed;
+      bottom: 180px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      font-weight: 800;
+      font-size: 15px;
+      color: #ffe066;
+      background: rgba(0,0,0,0.55);
+      padding: 10px 20px;
+      border-radius: 14px;
+      backdrop-filter: blur(6px);
+      text-align: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.35s;
+      z-index: 60;
+      white-space: nowrap;
+    }
+    #vendorGreeting.show { opacity: 1; }
+
+    /* ---------- Vendor shop modal ---------- */
+    .shopCard {
+      width: min(560px, calc(100vw - 32px));
+      max-height: calc(100vh - 64px);
+      overflow-y: auto;
+      background: rgba(14, 20, 28, 0.95);
+      border: 1px solid rgba(255,215,0,0.25);
+      border-radius: 18px;
+      box-shadow: 0 18px 70px rgba(0,0,0,0.55), 0 0 30px rgba(255,215,0,0.08);
+      padding: 20px 20px 16px;
+      color: #e8f0f7;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    .shopTitle {
+      font-weight: 900;
+      font-size: 20px;
+      color: #ffe066;
+      margin-bottom: 4px;
+    }
+    .shopSubtitle {
+      font-size: 12px;
+      opacity: 0.75;
+      margin-bottom: 14px;
+    }
+    .shopSection {
+      font-weight: 800;
+      font-size: 13px;
+      color: #ffe066;
+      margin: 14px 0 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .shopItem {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 8px;
+      transition: background 0.15s;
+    }
+    .shopItem:hover { background: rgba(255,255,255,0.08); }
+    .shopIcon {
+      width: 38px; height: 38px;
+      border-radius: 10px;
+      background: rgba(255,215,0,0.12);
+      display: grid;
+      place-items: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .shopInfo { flex: 1; }
+    .shopItemName { font-weight: 800; font-size: 14px; }
+    .shopItemDesc { font-size: 11px; opacity: 0.7; margin-top: 2px; }
+    .shopBuyBtn {
+      border: 1px solid rgba(255,215,0,0.3);
+      background: rgba(255,215,0,0.12);
+      color: #ffe066;
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-weight: 900;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .shopBuyBtn:active { transform: translateY(1px); }
+    .shopBuyBtn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .shopBuyBtn.owned {
+      border-color: rgba(120,220,120,0.3);
+      background: rgba(120,220,120,0.12);
+      color: #78dc78;
+    }
+    .shopCloseBtn {
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.08);
+      color: #e8f0f7;
+      border-radius: 12px;
+      padding: 10px 24px;
+      font-weight: 900;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 14px;
+    }
+    .shopCloseBtn:active { transform: translateY(1px); }
+    .shopWood {
+      font-size: 13px;
+      opacity: 0.85;
+      margin-bottom: 10px;
+    }
+    .shopWood span { font-weight: 900; color: #ffe066; }
+
     #donationModal, .touch-ui, .touch-joystick, .touch-chop, .modalBtn, .modalCard {
       -webkit-user-select: none;
       user-select: none;
@@ -257,8 +394,8 @@
   <div id="hud">
     <div class="statline">Score: <span id="score">0</span> &nbsp;•&nbsp; Wood: <span id="wood">0</span></div>
     <div id="hint">
-      Move: <b>WASD</b> • Sprint: <b>Shift</b> • Chop: <b>Hold Left Click</b><br/>
-      Aim at a tree (center dot), get close, and chop.
+      Move: <b>WASD</b> • Sprint: <b>Shift</b> • Chop: <b>Hold Left Click</b> • Shop: <b>E</b><br/>
+      Aim at a tree, get close, and chop. Find the hidden vendor!
     </div>
     <div id="chopWrap">
       <div id="barOuter"><div id="barInner"></div></div>
@@ -272,6 +409,29 @@
     <div id="joyBase" class="touch-joystick" aria-label="Move joystick">
       <div id="joyStick" class="stick"></div>
     </div>
+    <div id="chopBtn" class="touch-chop" aria-label="Chop button">CHOP</div>
+    <div id="vendorTouchBtn" class="touch-chop" aria-label="Interact" style="display:none; right:18px; bottom:140px; width:80px; height:80px; font-size:12px; background:rgba(255,215,0,0.15); border-color:rgba(255,215,0,0.3);">SHOP</div>
+  </div>
+
+  <!-- Vendor greeting toast -->
+  <div id="vendorGreeting"></div>
+
+  <!-- Vendor Shop modal -->
+  <div id="vendorShopModal" class="modalOverlay modalHidden" role="dialog" aria-modal="true">
+    <div class="shopCard">
+      <div class="shopTitle">Battle Pass Shop</div>
+      <div class="shopSubtitle">The wandering vendor has rare goods&hellip;</div>
+      <div class="shopWood">Your Wood: <span id="shopWoodCount">0</span></div>
+
+      <div class="shopSection">Wood Bundles</div>
+      <div id="shopWoodItems"></div>
+
+      <div class="shopSection">Powerups</div>
+      <div id="shopPowerItems"></div>
+
+      <button id="shopCloseBtn" class="shopCloseBtn">Leave Shop</button>
+    </div>
+  </div>
 
   <!-- Donation Modal (blocks input; game continues rendering behind) -->
   <div id="donationModal" class="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
@@ -288,10 +448,6 @@
       </div>
 
     </div>
-  </div>
-
-    <div id="chopBtn" class="touch-chop" aria-label="Chop button">CHOP</div>
-
   </div>
 
 
@@ -451,6 +607,7 @@
     scene.add(ground);
 
     // Rocks (sit on hills + align to slope)
+    const rockColliders = []; // { x, z, radius }
     const rockMat = new THREE.MeshStandardMaterial({ color: 0x2b2f33, roughness: 1 });
     for (let i = 0; i < 30; i++) {
       const size = 0.4 + Math.random() * 0.8;
@@ -474,6 +631,7 @@
       m.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(n, Math.random() * Math.PI * 2));
 
       scene.add(m);
+      rockColliders.push({ x, z, radius: r * 0.9 });
     }
 
     // ---------- Player ----------
@@ -499,6 +657,7 @@
     const woodEl = document.getElementById("wood");
     const barInner = document.getElementById("barInner");
     const targetNameEl = document.getElementById("targetName");
+    const centerDot = document.getElementById("centerDot");
     const hud = document.getElementById("hud");
     // ---------- Donation Modal ----------
     const donationModal = document.getElementById("donationModal");
@@ -583,6 +742,350 @@
     let score = 0;
     let wood = 0;
 
+    // ---------- Powerup state ----------
+    let chopMultiplier = 1.0;      // multiplied into chopRate
+    let speedMultiplier = 1.0;     // multiplied into move speed
+    let pickupRadiusMultiplier = 1.0; // multiplied into wood pickup range
+    let doubleDropActive = false;  // 2× wood from trees
+
+    // ---------- Vendor system ----------
+    const VENDOR_DETECT_RADIUS = 8;   // player sees vendor
+    const VENDOR_INTERACT_RADIUS = 4; // close enough to shop
+    const VENDOR_GREETINGS = [
+      "Psst! Over here, lumberjack!",
+      "Hey! Wanna see my wares?",
+      "Battle pass, fresh stock!",
+      "The finest goods in the forest!",
+      "You look like you need an upgrade!",
+    ];
+
+    let vendorGroup = null;
+    let vendorVisible = false;
+    let vendorShopOpen = false;
+    let vendorGreeted = false;     // so greeting only shows once per encounter
+    let vendorPos = { x: 0, z: 0 };
+
+    const vendorGreetingEl = document.getElementById("vendorGreeting");
+    const vendorShopModalEl = document.getElementById("vendorShopModal");
+    const shopCloseBtn = document.getElementById("shopCloseBtn");
+    const shopWoodCountEl = document.getElementById("shopWoodCount");
+    const shopWoodItemsEl = document.getElementById("shopWoodItems");
+    const shopPowerItemsEl = document.getElementById("shopPowerItems");
+
+    // Battle pass catalog
+    const shopCatalog = {
+      woodBundles: [
+        { id: "w10",  name: "Small Bundle",   desc: "+10 Wood",    icon: "🪵", cost: 0, woodGain: 10 },
+        { id: "w25",  name: "Medium Bundle",  desc: "+25 Wood",    icon: "🪵", cost: 5, woodGain: 25 },
+        { id: "w50",  name: "Large Bundle",   desc: "+50 Wood",    icon: "🪓", cost: 15, woodGain: 50 },
+        { id: "w100", name: "Mega Bundle",    desc: "+100 Wood",   icon: "🏗️", cost: 35, woodGain: 100 },
+      ],
+      powerups: [
+        { id: "pChop",   name: "Sharp Axe",       desc: "2× chop speed (permanent)",       icon: "⚡", cost: 20,  apply() { chopMultiplier = 2.0; } },
+        { id: "pSpeed",  name: "Swift Boots",      desc: "1.5× move speed (permanent)",     icon: "👟", cost: 15,  apply() { speedMultiplier = 1.5; } },
+        { id: "pPickup", name: "Magnetic Gloves",  desc: "2× pickup radius (permanent)",    icon: "🧲", cost: 12,  apply() { pickupRadiusMultiplier = 2.0; } },
+        { id: "pDouble", name: "Double Drops",     desc: "Trees drop 2× wood (permanent)",  icon: "🎁", cost: 30,  apply() { doubleDropActive = true; } },
+        { id: "pUltra",  name: "Ultra Axe",        desc: "4× chop speed (permanent)",       icon: "🔥", cost: 60,  apply() { chopMultiplier = 4.0; } },
+      ]
+    };
+    const ownedPowerups = new Set();
+
+    function createVendor() {
+      // Pick a random location far-ish from spawn
+      let x, z;
+      do {
+        x = (Math.random() - 0.5) * 100;
+        z = (Math.random() - 0.5) * 100;
+      } while (Math.hypot(x, z) < 25); // at least 25 units from origin
+
+      vendorPos.x = x;
+      vendorPos.z = z;
+
+      const y = getGroundHeight(x, z);
+
+      vendorGroup = new THREE.Group();
+      vendorGroup.position.set(x, y, z);
+
+      // Body (purple robe)
+      const robeGeo = new THREE.CapsuleGeometry(0.5, 1.0, 6, 10);
+      const robeMat = new THREE.MeshStandardMaterial({ color: 0x8844cc, roughness: 0.7 });
+      const robe = new THREE.Mesh(robeGeo, robeMat);
+      robe.position.y = 1.0;
+      vendorGroup.add(robe);
+
+      // Head
+      const headGeo = new THREE.SphereGeometry(0.32, 8, 8);
+      const headMat = new THREE.MeshStandardMaterial({ color: 0xf0d0a0, roughness: 0.8 });
+      const head = new THREE.Mesh(headGeo, headMat);
+      head.position.y = 1.9;
+      vendorGroup.add(head);
+
+      // Hat (cone)
+      const hatGeo = new THREE.ConeGeometry(0.45, 0.7, 8);
+      const hatMat = new THREE.MeshStandardMaterial({ color: 0x5522aa, roughness: 0.6 });
+      const hat = new THREE.Mesh(hatGeo, hatMat);
+      hat.position.y = 2.4;
+      vendorGroup.add(hat);
+
+      // Backpack (box of wares)
+      const packGeo = new THREE.BoxGeometry(0.6, 0.6, 0.4);
+      const packMat = new THREE.MeshStandardMaterial({ color: 0x8a6a3a, roughness: 0.9 });
+      const pack = new THREE.Mesh(packGeo, packMat);
+      pack.position.set(0, 1.1, -0.45);
+      vendorGroup.add(pack);
+
+      // Floating indicator (gold diamond above head)
+      const indGeo = new THREE.OctahedronGeometry(0.18, 0);
+      const indMat = new THREE.MeshStandardMaterial({ color: 0xffdd44, emissive: 0xffaa00, emissiveIntensity: 0.4, roughness: 0.3 });
+      const indicator = new THREE.Mesh(indGeo, indMat);
+      indicator.position.y = 3.0;
+      indicator.name = "vendorIndicator";
+      vendorGroup.add(indicator);
+
+      vendorGroup.visible = false;
+      vendorVisible = false;
+      vendorGreeted = false;
+
+      scene.add(vendorGroup);
+    }
+
+    function relocateVendor() {
+      let x, z;
+      do {
+        x = (Math.random() - 0.5) * 120;
+        z = (Math.random() - 0.5) * 120;
+      } while (Math.hypot(x - player.position.x, z - player.position.z) < 30);
+
+      vendorPos.x = x;
+      vendorPos.z = z;
+      const y = getGroundHeight(x, z);
+      vendorGroup.position.set(x, y, z);
+      vendorGroup.visible = false;
+      vendorVisible = false;
+      vendorGreeted = false;
+    }
+
+    function playVendorSound() {
+      if (!audioCtx) return;
+      const t = audioCtx.currentTime;
+      // Mystical chime
+      [660, 880, 1100].forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, t + i * 0.08);
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.0001, t + i * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.12, t + i * 0.08 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.08 + 0.25);
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start(t + i * 0.08);
+        osc.stop(t + i * 0.08 + 0.3);
+      });
+    }
+
+    function playPurchaseSound() {
+      if (!audioCtx) return;
+      const t = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(520, t);
+      osc.frequency.exponentialRampToValueAtTime(1040, t + 0.1);
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.15, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start(t);
+      osc.stop(t + 0.22);
+    }
+
+    function renderShopItems() {
+      shopWoodCountEl.textContent = String(wood);
+
+      // Wood bundles
+      shopWoodItemsEl.innerHTML = "";
+      for (const item of shopCatalog.woodBundles) {
+        const row = document.createElement("div");
+        row.className = "shopItem";
+        const canAfford = wood >= item.cost;
+        row.innerHTML = `
+          <div class="shopIcon">${item.icon}</div>
+          <div class="shopInfo">
+            <div class="shopItemName">${item.name}</div>
+            <div class="shopItemDesc">${item.desc}</div>
+          </div>
+          <button class="shopBuyBtn" ${canAfford ? "" : "disabled"}>${item.cost === 0 ? "FREE" : item.cost + " Wood"}</button>
+        `;
+        row.querySelector(".shopBuyBtn").addEventListener("click", (e) => {
+          e.preventDefault(); e.stopPropagation();
+          if (wood < item.cost) return;
+          wood -= item.cost;
+          wood += item.woodGain;
+          woodEl.textContent = String(wood);
+          spawnFloatText(player.position, `+${item.woodGain} Wood`);
+          playPurchaseSound();
+          renderShopItems();
+        });
+        shopWoodItemsEl.appendChild(row);
+      }
+
+      // Powerups
+      shopPowerItemsEl.innerHTML = "";
+      for (const item of shopCatalog.powerups) {
+        const row = document.createElement("div");
+        row.className = "shopItem";
+        const owned = ownedPowerups.has(item.id);
+        const canAfford = wood >= item.cost && !owned;
+        row.innerHTML = `
+          <div class="shopIcon">${item.icon}</div>
+          <div class="shopInfo">
+            <div class="shopItemName">${item.name}</div>
+            <div class="shopItemDesc">${item.desc}</div>
+          </div>
+          <button class="shopBuyBtn ${owned ? "owned" : ""}" ${canAfford ? "" : "disabled"}>${owned ? "OWNED" : item.cost + " Wood"}</button>
+        `;
+        if (!owned) {
+          row.querySelector(".shopBuyBtn").addEventListener("click", (e) => {
+            e.preventDefault(); e.stopPropagation();
+            if (wood < item.cost || ownedPowerups.has(item.id)) return;
+            wood -= item.cost;
+            woodEl.textContent = String(wood);
+            ownedPowerups.add(item.id);
+            item.apply();
+            spawnFloatText(player.position, item.name + " acquired!");
+            playPurchaseSound();
+            renderShopItems();
+          });
+        }
+        shopPowerItemsEl.appendChild(row);
+      }
+    }
+
+    function openVendorShop() {
+      vendorShopOpen = true;
+      modalOpen = true;
+      renderShopItems();
+      vendorShopModalEl.classList.remove("modalHidden");
+      vendorGreetingEl.classList.remove("show");
+    }
+
+    function closeVendorShop() {
+      vendorShopOpen = false;
+      modalOpen = false;
+      vendorShopModalEl.classList.add("modalHidden");
+      renderer.domElement.focus();
+      // After closing shop, vendor relocates to a new spot
+      relocateVendor();
+    }
+
+    shopCloseBtn.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      closeVendorShop();
+    });
+
+    vendorShopModalEl.addEventListener("pointerdown", (e) => {
+      e.preventDefault(); e.stopPropagation();
+    }, { passive: false });
+
+    // "E" key to interact with vendor
+    document.addEventListener("keydown", (e) => {
+      if (e.code === "KeyE") {
+        if (vendorShopOpen) {
+          closeVendorShop();
+        } else if (vendorVisible && !modalOpen) {
+          // Check proximity
+          const dx = player.position.x - vendorPos.x;
+          const dz = player.position.z - vendorPos.z;
+          if (Math.hypot(dx, dz) <= VENDOR_INTERACT_RADIUS) {
+            initAudio();
+            openVendorShop();
+          }
+        }
+      }
+    });
+
+    function updateVendor(dt) {
+      if (!vendorGroup) return;
+
+      const dx = player.position.x - vendorPos.x;
+      const dz = player.position.z - vendorPos.z;
+      const dist = Math.hypot(dx, dz);
+
+      // Reveal vendor when player gets close
+      if (!vendorVisible && dist <= VENDOR_DETECT_RADIUS) {
+        vendorGroup.visible = true;
+        vendorVisible = true;
+        playVendorSound();
+      }
+
+      // Greeting
+      if (vendorVisible && !vendorGreeted && dist <= VENDOR_DETECT_RADIUS) {
+        vendorGreeted = true;
+        const greet = VENDOR_GREETINGS[Math.floor(Math.random() * VENDOR_GREETINGS.length)];
+        vendorGreetingEl.textContent = greet + " (Press E to shop)";
+        vendorGreetingEl.classList.add("show");
+      }
+
+      // Hide greeting when too far or shop is open
+      if (vendorGreeted && (dist > VENDOR_DETECT_RADIUS || vendorShopOpen)) {
+        vendorGreetingEl.classList.remove("show");
+      }
+
+      // Re-show greeting prompt when close but not shopping
+      if (vendorVisible && vendorGreeted && dist <= VENDOR_INTERACT_RADIUS && !vendorShopOpen) {
+        vendorGreetingEl.textContent = "Press E to open shop";
+        vendorGreetingEl.classList.add("show");
+      }
+
+      // Hide if player walked away
+      if (vendorVisible && dist > VENDOR_DETECT_RADIUS * 1.5) {
+        vendorGroup.visible = false;
+        vendorVisible = false;
+        vendorGreeted = false;
+        vendorGreetingEl.classList.remove("show");
+      }
+
+      // Animate the floating indicator
+      const ind = vendorGroup.getObjectByName("vendorIndicator");
+      if (ind) {
+        ind.position.y = 3.0 + Math.sin(performance.now() * 0.003) * 0.2;
+        ind.rotation.y += dt * 2.0;
+      }
+
+      // Make vendor face player when visible
+      if (vendorVisible) {
+        const angle = Math.atan2(dx, dz);
+        vendorGroup.rotation.y = angle;
+      }
+
+      // Touch: show/hide interact button
+      if (isTouchDevice && vendorTouchBtn) {
+        vendorTouchBtn.style.display =
+          (vendorVisible && dist <= VENDOR_INTERACT_RADIUS && !vendorShopOpen) ? "" : "none";
+      }
+    }
+
+    createVendor();
+
+    // Touch vendor interact button
+    const vendorTouchBtn = document.getElementById("vendorTouchBtn");
+    vendorTouchBtn?.addEventListener("pointerdown", (e) => {
+      if (!isTouchDevice) return;
+      e.preventDefault();
+      initAudio();
+      if (vendorShopOpen) {
+        closeVendorShop();
+      } else if (vendorVisible && !modalOpen) {
+        const ddx = player.position.x - vendorPos.x;
+        const ddz = player.position.z - vendorPos.z;
+        if (Math.hypot(ddx, ddz) <= VENDOR_INTERACT_RADIUS) {
+          openVendorShop();
+        }
+      }
+    }, { passive: false });
+
     // ---------- Donation modal random timer ----------
     let nextDonationAt = 0;
 
@@ -597,7 +1100,7 @@
 
     document.addEventListener("keydown", (e) => {
       // Keep focus / pointer lock stable and stop browser shortcuts
-      if (["KeyW","KeyA","KeyS","KeyD","ShiftLeft","ShiftRight","Space",
+      if (["KeyW","KeyA","KeyS","KeyD","KeyE","ShiftLeft","ShiftRight","Space",
           "ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)) {
         e.preventDefault();
       }
@@ -854,6 +1357,26 @@
       osc.stop(t + 0.28);
     }
 
+    function playWoodPickupSound() {
+      if (!audioCtx) return;
+      const t = audioCtx.currentTime;
+
+      // Bright rising "pop" for collecting wood
+      const osc = audioCtx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(660 + Math.random() * 180, t);
+      osc.frequency.exponentialRampToValueAtTime(1320 + Math.random() * 200, t + 0.07);
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.18, t + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start(t);
+      osc.stop(t + 0.15);
+    }
 
 
     // ---------- Helpers ----------
@@ -862,6 +1385,27 @@
     const tmpV = new THREE.Vector3();
     const tmpV2 = new THREE.Vector3();
     const UP = new THREE.Vector3(0, 1, 0);
+    const CIRCLE_FACE = new THREE.Vector3(0, 0, 1); // CircleGeometry normal
+
+    // Pre-allocated temps to avoid per-frame garbage (#6)
+    const _moveVec = new THREE.Vector3();
+    const _camFwd = new THREE.Vector3();
+    const _camRight = new THREE.Vector3();
+    const _camOffset = new THREE.Vector3();
+    const _desiredCam = new THREE.Vector3();
+    const _fallQ = new THREE.Quaternion();
+    const _wobbleAxis = new THREE.Vector3();
+    const _wobbleQ = new THREE.Quaternion();
+    const _projVec = new THREE.Vector3();
+
+    // Raycast throttle (#8)
+    let raycastFrame = 0;
+    let cachedTarget = null;
+    const RAYCAST_INTERVAL = 3;
+
+    // Player collision radius
+    const PLAYER_RADIUS = 0.45;
+    const TREE_TRUNK_RADIUS = 0.35;
 
     function clamp01(x){ return Math.max(0, Math.min(1, x)); }
     function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
@@ -875,6 +1419,115 @@
       return a + delta * t;
     }
 
+    // ---------- Floating "+1" text (#4) ----------
+    const floatTexts = [];
+
+    function spawnFloatText(worldPos, text) {
+      const el = document.createElement("div");
+      el.className = "floatText";
+      el.textContent = text;
+      document.body.appendChild(el);
+      floatTexts.push({
+        el,
+        wx: worldPos.x, wy: worldPos.y + 1.5, wz: worldPos.z,
+        life: 1.0,
+        maxLife: 1.0,
+        offsetY: 0
+      });
+    }
+
+    function updateFloatTexts(dt) {
+      for (let i = floatTexts.length - 1; i >= 0; i--) {
+        const ft = floatTexts[i];
+        ft.life -= dt;
+        ft.offsetY += dt * 1.8;
+        if (ft.life <= 0) {
+          ft.el.remove();
+          floatTexts.splice(i, 1);
+          continue;
+        }
+        _projVec.set(ft.wx, ft.wy + ft.offsetY, ft.wz);
+        _projVec.project(camera);
+        if (_projVec.z > 1) { ft.el.style.display = "none"; continue; }
+        ft.el.style.display = "";
+        const sx = ( _projVec.x * 0.5 + 0.5) * window.innerWidth;
+        const sy = (-_projVec.y * 0.5 + 0.5) * window.innerHeight;
+        ft.el.style.left = sx + "px";
+        ft.el.style.top  = sy + "px";
+        ft.el.style.opacity = String(ft.life / ft.maxLife);
+        ft.el.style.transform = "translate(-50%,-50%)";
+      }
+    }
+
+    // ---------- Collision (trees & rocks) ----------
+    function resolveCollisions() {
+      for (const tree of trees) {
+        if (!tree.userData.alive || tree.userData.falling) continue;
+        const dx = player.position.x - tree.position.x;
+        const dz = player.position.z - tree.position.z;
+        const dist = Math.hypot(dx, dz);
+        const minDist = PLAYER_RADIUS + TREE_TRUNK_RADIUS * tree.scale.x;
+        if (dist < minDist && dist > 0.001) {
+          const push = (minDist - dist) / dist;
+          player.position.x += dx * push;
+          player.position.z += dz * push;
+        }
+      }
+      for (const rock of rockColliders) {
+        const dx = player.position.x - rock.x;
+        const dz = player.position.z - rock.z;
+        const dist = Math.hypot(dx, dz);
+        const minDist = PLAYER_RADIUS + rock.radius;
+        if (dist < minDist && dist > 0.001) {
+          const push = (minDist - dist) / dist;
+          player.position.x += dx * push;
+          player.position.z += dz * push;
+        }
+      }
+    }
+
+    // ---------- Clouds (#13) ----------
+    const clouds = [];
+    (function createClouds() {
+      const cloudMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff, transparent: true, opacity: 0.7
+      });
+      for (let i = 0; i < 14; i++) {
+        const cloud = new THREE.Group();
+        const puffs = 3 + Math.floor(Math.random() * 3);
+        for (let j = 0; j < puffs; j++) {
+          const sz = 3 + Math.random() * 5;
+          const puff = new THREE.Mesh(
+            new THREE.SphereGeometry(sz, 8, 6), cloudMat
+          );
+          puff.position.set(
+            (Math.random() - 0.5) * 10,
+            (Math.random() - 0.5) * 2,
+            (Math.random() - 0.5) * 5
+          );
+          puff.scale.y = 0.35 + Math.random() * 0.25;
+          cloud.add(puff);
+        }
+        cloud.position.set(
+          (Math.random() - 0.5) * 400,
+          55 + Math.random() * 40,
+          (Math.random() - 0.5) * 400
+        );
+        cloud.userData.speed = 1.5 + Math.random() * 2.5;
+        cloud.userData.dir = Math.random() > 0.5 ? 1 : -1;
+        scene.add(cloud);
+        clouds.push(cloud);
+      }
+    })();
+
+    function updateClouds(dt) {
+      for (const c of clouds) {
+        c.position.x += c.userData.speed * c.userData.dir * dt;
+        if (c.position.x >  250) c.position.x = -250;
+        if (c.position.x < -250) c.position.x =  250;
+      }
+    }
+
     // ---------- Particles (woodchips + leaves) ----------
     const particles = []; // { mesh, v, life, maxLife, spin, drag, gravity, groundBounce, type }
 
@@ -883,6 +1536,29 @@
 
     const woodChipGeo = new THREE.BoxGeometry(0.06, 0.02, 0.02);
     const leafGeo     = new THREE.PlaneGeometry(0.08, 0.10);
+
+    // ---------- Particle pool (#7) ----------
+    const chipPool = [];
+    const leafPool = [];
+    const POOL_MAX = 80;
+
+    function getPooledMesh(type) {
+      const pool = type === "chip" ? chipPool : type === "leaf" ? leafPool : null;
+      if (pool && pool.length > 0) {
+        const m = pool.pop();
+        m.material.opacity = 1;
+        m.material.transparent = false;
+        return m;
+      }
+      if (type === "chip") return new THREE.Mesh(woodChipGeo, woodChipMat.clone());
+      if (type === "leaf") return new THREE.Mesh(leafGeo, leafMat.clone());
+      return null;
+    }
+
+    function releasePooledMesh(mesh, type) {
+      const pool = type === "chip" ? chipPool : type === "leaf" ? leafPool : null;
+      if (pool && pool.length < POOL_MAX) pool.push(mesh);
+    }
 
     // ---------- "White puddle" splat ----------
     const puddleMat = new THREE.MeshBasicMaterial({
@@ -901,19 +1577,21 @@
       // Main puddle
       {
         const m = new THREE.Mesh(puddleGeo, puddleMat.clone());
-        const y = getGroundHeight(baseX, baseZ) + 0.015;
+        const y = getGroundHeight(baseX, baseZ) + 0.02;
         m.position.set(baseX, y, baseZ);
-        m.rotation.x = -Math.PI / 2;
+        // Align to ground slope so puddle doesn't clip terrain (#12)
+        const pn = getGroundNormal(baseX, baseZ);
+        m.quaternion.setFromUnitVectors(CIRCLE_FACE, pn);
 
         // Start small, expand fast
-        const endScale = 3.0 + Math.random() * 2.5; // MUCH larger splash
+        const endScale = 3.0 + Math.random() * 2.5;
         m.scale.set(0.12, 0.12, 0.12);
 
         scene.add(m);
         particles.push({
           mesh: m,
           v: new THREE.Vector3(0, 0, 0),
-          life: 7.0,        // lasts way longer
+          life: 7.0,
           maxLife: 7.0,
           spin: new THREE.Vector3(0, 0, 0),
           drag: 1,
@@ -921,26 +1599,29 @@
           groundBounce: 0,
           type: "puddle",
           startScale: 0.08,
-          endScale
+          endScale,
+          slopeQuat: m.quaternion.clone()
         });
       }
 
       // Droplets (small splats around it)
-      const drops = 7 + Math.floor(Math.random() * 6); // 7..12
+      const drops = 7 + Math.floor(Math.random() * 6);
       for (let i = 0; i < drops; i++) {
         const m = new THREE.Mesh(puddleGeo, puddleMat.clone());
         m.material.opacity = 0.85;
 
-        const r = 1.4 + Math.random() * 3.0; // splat farther from trunk
+        const r = 1.4 + Math.random() * 3.0;
         const a = Math.random() * Math.PI * 2;
         const x = baseX + Math.cos(a) * r;
         const z = baseZ + Math.sin(a) * r;
-        const y = getGroundHeight(x, z) + 0.015;
+        const y = getGroundHeight(x, z) + 0.02;
 
         m.position.set(x, y, z);
-        m.rotation.x = -Math.PI / 2;
+        // Align droplet to ground slope
+        const dn = getGroundNormal(x, z);
+        m.quaternion.setFromUnitVectors(CIRCLE_FACE, dn);
 
-        const endScale = 0.6 + Math.random() * 1.1; // much larger droplets
+        const endScale = 0.6 + Math.random() * 1.1;
         m.scale.set(0.08, 0.08, 0.08);
 
         scene.add(m);
@@ -957,7 +1638,8 @@
           groundBounce: 0,
           type: "puddle",
           startScale: 0.05,
-          endScale
+          endScale,
+          slopeQuat: m.quaternion.clone()
         });
       }
     }
@@ -976,7 +1658,7 @@
       // --- woodchips (fast) ---
       const chipCount = 10 + Math.floor(Math.random() * 8);
       for (let i = 0; i < chipCount; i++) {
-        const m = new THREE.Mesh(woodChipGeo, woodChipMat);
+        const m = getPooledMesh("chip");
         m.position.copy(origin);
         m.position.x += (Math.random() - 0.5) * 0.18;
         m.position.y += (Math.random() - 0.5) * 0.20;
@@ -1008,7 +1690,7 @@
       // --- leaves (slow + floaty) ---
       const leafCount = 6 + Math.floor(Math.random() * 6);
       for (let i = 0; i < leafCount; i++) {
-        const m = new THREE.Mesh(leafGeo, leafMat);
+        const m = getPooledMesh("leaf");
         m.position.copy(origin);
         m.position.y += 1.3 + Math.random() * 0.8; // originate higher
         m.position.x += (Math.random() - 0.5) * 0.9;
@@ -1048,10 +1730,12 @@
 
         p.mesh.position.addScaledVector(p.v, dt);
 
-        // spin
-        p.mesh.rotation.x += p.spin.x * dt;
-        p.mesh.rotation.y += p.spin.y * dt;
-        p.mesh.rotation.z += p.spin.z * dt;
+        // spin (skip puddles — they use quaternion alignment)
+        if (p.type !== "puddle") {
+          p.mesh.rotation.x += p.spin.x * dt;
+          p.mesh.rotation.y += p.spin.y * dt;
+          p.mesh.rotation.z += p.spin.z * dt;
+        }
 
         // ground
         const gy = getGroundHeight(p.mesh.position.x, p.mesh.position.z) + 0.02;
@@ -1079,17 +1763,19 @@
           const t = 1 - lifeFrac; // 0..1 over lifetime
 
           // Spread slowly over most of lifetime
-          const hold = 0.10;                 // brief "splat appears"
-          const spreadPortion = 0.85;         // use 85% of lifetime to expand
+          const hold = 0.10;
+          const spreadPortion = 0.85;
           const tt = (t - hold) / spreadPortion;
-          const grow = easeOutCubic(Math.max(0, Math.min(1, tt))); // slow creep
+          const grow = easeOutCubic(Math.max(0, Math.min(1, tt)));
 
           const s = p.startScale + (p.endScale - p.startScale) * grow;
           p.mesh.scale.set(s, s, s);
-          p.mesh.rotation.x = -Math.PI / 2;
+
+          // Align to stored ground slope quaternion (#12)
+          if (p.slopeQuat) p.mesh.quaternion.copy(p.slopeQuat);
 
           // Pin to ground
-          p.mesh.position.y = getGroundHeight(p.mesh.position.x, p.mesh.position.z) + 0.015;
+          p.mesh.position.y = getGroundHeight(p.mesh.position.x, p.mesh.position.z) + 0.02;
 
           // Fade VERY slowly, mostly at the end
           const fadeStart = 0.70; // don't really fade until 70% of lifetime has passed
@@ -1108,6 +1794,7 @@
 
         if (p.life <= 0) {
           scene.remove(p.mesh);
+          if (p.type === "chip" || p.type === "leaf") releasePooledMesh(p.mesh, p.type);
           particles.splice(i, 1);
         }
       }
@@ -1261,12 +1948,16 @@
         // auto-collect if close to player
         tmpV.copy(d.position).sub(player.position);
         tmpV.y = 0;
-        if (tmpV.length() < 1.15) {
+        if (tmpV.length() < 1.15 * pickupRadiusMultiplier) {
+          const gain = doubleDropActive ? 2 : 1;
+          spawnFloatText(d.position, `+${gain} Wood`);
+          playWoodPickupSound();
+
           d.userData.collected = true;
           woodGroup.remove(d);
           woodDrops.splice(i, 1);
 
-          wood += 1;
+          wood += gain;
           woodEl.textContent = String(wood);
         }
       }
@@ -1298,7 +1989,8 @@
     }
 
     // ---------- Chopping + falling ----------
-    const chopRate = 0.60; // hp per second
+    const BASE_CHOP_RATE = 0.60; // hp per second
+    // chopRate is now computed dynamically via chopMultiplier
     const fallDuration = 0.65; // seconds
     const removeDelayAfterFall = 1.1;
     // Chop "hit" cadence (visual + sound)
@@ -1346,10 +2038,9 @@
           const angle = eased * targetAngle;
           t.userData.fallAngle = angle;
 
-          // Apply axis-angle rotation (keep base at y=0)
           // Apply fall rotation relative to the tree's base (slope-aligned) rotation
-          const fallQ = new THREE.Quaternion().setFromAxisAngle(t.userData.fallAxis, angle);
-          t.quaternion.copy(t.userData.baseQuat).multiply(fallQ);
+          _fallQ.setFromAxisAngle(t.userData.fallAxis, angle);
+          t.quaternion.copy(t.userData.baseQuat).multiply(_fallQ);
 
           // when impact happens (fallT hits 1), schedule removal + spawn wood once
           if (t.userData.fallT >= 1 && t.userData.removeAt == null) {
@@ -1375,8 +2066,8 @@
     }
 
     // ---------- Movement tuning ----------
-    const baseSpeed = 6.0;
-    const sprintSpeed = 10.0;
+    const BASE_SPEED = 6.0;
+    const BASE_SPRINT = 10.0;
     const turnSpeed = 12.0;
 
     // ---------- Jump / gravity ----------
@@ -1424,117 +2115,121 @@
 
       // --- Movement (camera-relative) ---
       const sprint = (keys.has("ShiftLeft") || keys.has("ShiftRight")) || (isTouchDevice && joy.sprint);
-      const speed = sprint ? sprintSpeed : baseSpeed;
+      const speed = (sprint ? BASE_SPRINT : BASE_SPEED) * speedMultiplier;
 
-      const move = new THREE.Vector3();
-
-      // Forward/right derived ONLY from mouse-look yaw
-      const camForward = new THREE.Vector3(
-        -Math.sin(camYaw), 0, -Math.cos(camYaw)
-      ).normalize();
-        const camRight = new THREE.Vector3()
-          .crossVectors(camForward, UP)
-          .normalize();
+      _moveVec.set(0, 0, 0);
+      _camFwd.set(-Math.sin(camYaw), 0, -Math.cos(camYaw)).normalize();
+      _camRight.crossVectors(_camFwd, UP).normalize();
 
       // Keyboard
-      if (keys.has("KeyW")) move.add(camForward);
-      if (keys.has("KeyS")) move.sub(camForward);
-      if (keys.has("KeyA")) move.sub(camRight);
-      if (keys.has("KeyD")) move.add(camRight);
+      if (keys.has("KeyW")) _moveVec.add(_camFwd);
+      if (keys.has("KeyS")) _moveVec.sub(_camFwd);
+      if (keys.has("KeyA")) _moveVec.sub(_camRight);
+      if (keys.has("KeyD")) _moveVec.add(_camRight);
 
       // Touch joystick
       if (isTouchDevice && (joy.x !== 0 || joy.y !== 0)) {
-        move.addScaledVector(camRight, joy.x);
-        move.addScaledVector(camForward, joy.y);
+        _moveVec.addScaledVector(_camRight, joy.x);
+        _moveVec.addScaledVector(_camFwd, joy.y);
       }
 
-      if (move.lengthSq() > 0) {
-        move.normalize();
+      if (_moveVec.lengthSq() > 0) {
+        _moveVec.normalize();
 
         // Rotate player to face movement direction (camera-relative)
-        const targetYaw = Math.atan2(move.x, move.z);
+        const targetYaw = Math.atan2(_moveVec.x, _moveVec.z);
         player.rotation.y = lerpAngle(
           player.rotation.y,
           targetYaw,
           Math.min(1, turnSpeed * dt)
         );
 
-
-        // Move strictly in camera-facing direction
-        player.position.addScaledVector(move, speed * dt);
+        player.position.addScaledVector(_moveVec, speed * dt);
       }
 
-        // Ground height under player (terrain)
-        const groundY = getGroundHeight(player.position.x, player.position.z);
+      // --- Collision with trees & rocks ---
+      resolveCollisions();
 
-        // Jump (Space) only when grounded
-        if (keys.has("Space") && isGrounded) {
-          playerVy = jumpSpeed;
-          isGrounded = false;
-        }
+      // Ground height under player (terrain)
+      const groundY = getGroundHeight(player.position.x, player.position.z);
 
-        // Gravity integration
-        playerVy += gravity * dt;
-        player.position.y += playerVy * dt;
+      // Jump (Space) only when grounded
+      if (keys.has("Space") && isGrounded) {
+        playerVy = jumpSpeed;
+        isGrounded = false;
+      }
 
-        // Ground collision / landing
-        if (player.position.y <= groundY) {
-          player.position.y = groundY;
-          playerVy = 0;
-          isGrounded = true;
-        }
+      // Gravity integration
+      playerVy += gravity * dt;
+      player.position.y += playerVy * dt;
+
+      // Ground collision / landing
+      if (player.position.y <= groundY) {
+        player.position.y = groundY;
+        playerVy = 0;
+        isGrounded = true;
+      }
 
       // --- Camera (mouse-look orbit behind player) ---
       const camDistance = 10;
-      const camHeight   = 2.2;
+      const camHeight = 2.2;
 
-      // Build an offset from yaw/pitch like an orbit camera
-      const offset = new THREE.Vector3(
+      _camOffset.set(
         Math.sin(camYaw) * Math.cos(camPitch),
         Math.sin(camPitch),
         Math.cos(camYaw) * Math.cos(camPitch)
       ).multiplyScalar(camDistance);
 
-            // Position camera behind/around player
-      const desiredCamPos = player.position.clone().add(offset);
-      desiredCamPos.y += camHeight;
+      _desiredCam.copy(player.position).add(_camOffset);
+      _desiredCam.y += camHeight;
 
-      // --- Ground collision (simple clamp) ---
-      const minCamY = 0.6;              // keep camera above ground
-      desiredCamPos.y = Math.max(minCamY, desiredCamPos.y);
+      // --- Camera ground collision (terrain-aware #14) ---
+      const camGroundY = getGroundHeight(_desiredCam.x, _desiredCam.z) + 1.0;
+      _desiredCam.y = Math.max(camGroundY, _desiredCam.y);
 
       // Smooth camera
-      camera.position.lerp(desiredCamPos, 1 - Math.pow(0.001, dt));
+      camera.position.lerp(_desiredCam, 1 - Math.pow(0.001, dt));
 
       // Look at player (slightly above center)
       camera.lookAt(player.position.x, player.position.y + 1.2, player.position.z);
 
-      // --- Targeting ---
-      const target = pickTreeFromCenter();
+      // --- Targeting (throttled raycast #8) ---
+      raycastFrame++;
+      if (raycastFrame >= RAYCAST_INTERVAL || isChopping) {
+        raycastFrame = 0;
+        cachedTarget = pickTreeFromCenter();
+      }
+      const target = cachedTarget;
       targetNameEl.textContent = target ? target.name : "None";
+
+      // Reticle color (#5)
+      if (target) {
+        centerDot.classList.add("targeting");
+      } else {
+        centerDot.classList.remove("targeting");
+      }
 
       // --- Chopping ---
       if (target && isChopping) {
-        target.userData.hp = clamp01(target.userData.hp - chopRate * dt);
+        target.userData.hp = clamp01(target.userData.hp - BASE_CHOP_RATE * chopMultiplier * dt);
 
-        // crude feedback: wiggle the axe + shake target slightly
-      axe.rotation.z = Math.sin(performance.now() * 0.05) * 0.6;
+        // Wiggle the axe
+        axe.rotation.z = Math.sin(performance.now() * 0.05) * 0.6;
 
-      // If we switched targets, reset the old tree so it doesn't stay tilted
-      if (lastWobbleTree && lastWobbleTree !== target && !lastWobbleTree.userData.falling && lastWobbleTree.userData.baseQuat) {
-        lastWobbleTree.quaternion.copy(lastWobbleTree.userData.baseQuat);
-      }
-      lastWobbleTree = target;
+        // If we switched targets, reset the old tree so it doesn't stay tilted
+        if (lastWobbleTree && lastWobbleTree !== target && !lastWobbleTree.userData.falling && lastWobbleTree.userData.baseQuat) {
+          lastWobbleTree.quaternion.copy(lastWobbleTree.userData.baseQuat);
+        }
+        lastWobbleTree = target;
 
-      // Apply wobble only to non-falling trees
-      if (!target.userData.falling) {
-        // Wobble relative to base rotation so it never permanently tilts
-        if (!target.userData.baseQuat) target.userData.baseQuat = target.quaternion.clone();
-        const wobble = Math.sin(performance.now() * 0.03) * 0.06;
-        const wobbleAxis = new THREE.Vector3(1,0,0).applyQuaternion(target.userData.baseQuat).normalize();
-        const wobbleQ = new THREE.Quaternion().setFromAxisAngle(wobbleAxis, wobble);
-        target.quaternion.copy(target.userData.baseQuat).multiply(wobbleQ);
-      }
+        // Apply wobble only to non-falling trees
+        if (!target.userData.falling) {
+          if (!target.userData.baseQuat) target.userData.baseQuat = target.quaternion.clone();
+          const wobble = Math.sin(performance.now() * 0.03) * 0.06;
+          _wobbleAxis.set(1, 0, 0).applyQuaternion(target.userData.baseQuat).normalize();
+          _wobbleQ.setFromAxisAngle(_wobbleAxis, wobble);
+          target.quaternion.copy(target.userData.baseQuat).multiply(_wobbleQ);
+        }
 
         // Trigger particles + sound at a steady "axe hit" rhythm
         chopHitTimer -= dt;
@@ -1546,24 +2241,17 @@
         }
 
         if (target.userData.hp <= 0 && !target.userData.falling) {
-          // count as chopped
           score += 1;
           scoreEl.textContent = String(score);
-
-          // begin fall away from player
           startTreeFall(target);
-
-          // reset so next tree hit starts with an immediate burst
           chopHitTimer = 0;
         }
       } else {
         axe.rotation.z = 0;
-        // Reset any previously wobbled tree back to its base orientation
         if (lastWobbleTree && lastWobbleTree.userData.baseQuat && !lastWobbleTree.userData.falling) {
           lastWobbleTree.quaternion.copy(lastWobbleTree.userData.baseQuat);
         }
         chopHitTimer = 0;
-
         lastWobbleTree = null;
       }
 
@@ -1575,18 +2263,19 @@
         barInner.style.width = `0%`;
       }
 
-      // --- Update falling + drops ---
+      // --- Update systems ---
       updateFallingTrees(dt, nowSeconds);
-      
-      // --- Random donation popup ---
+
       if (!modalOpen && nowSeconds >= nextDonationAt) {
         openDonationModal();
         scheduleNextDonation(nowSeconds);
       }
-      
+
+      updateVendor(dt);
       updateWoodDrops(dt);
       updateParticles(dt);
-
+      updateClouds(dt);
+      updateFloatTexts(dt);
 
       renderer.render(scene, camera);
 
